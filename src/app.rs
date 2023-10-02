@@ -6,7 +6,7 @@ use crate::bluetooth::*;
 
 // external crates
 use eframe::egui;
-use simplersble::{self, Adapter};
+use simplersble::{self, Adapter, Peripheral};
 use std::pin::Pin;
 
 /*=======================================================================
@@ -28,10 +28,11 @@ pub struct BikeApp {
     active_tab: Tabs,
     // bluetooth stuff
     bt_adapters: Option<Vec<Pin<Box<Adapter>>>>,
-    selected_adapter: Option<Adapter>,
+    selected_adapter: Option<Pin<Box<Adapter>>>,
     selected_adapter_number: Option<usize>,
     adapter_text: String,
-    peripheral_list: Vec<simplersble::Peripheral>,
+    peripheral_list: Option<Vec<Pin<Box<Peripheral>>>>,
+    selected_peripheral_number: Option<usize>,
 }
 
 impl Default for BikeApp {
@@ -42,7 +43,8 @@ impl Default for BikeApp {
             selected_adapter: None,
             selected_adapter_number: None,
             adapter_text: "None selected".to_string(),
-            peripheral_list: Vec::new(),
+            peripheral_list: None,
+            selected_peripheral_number: None,
         }
     }
 }
@@ -62,29 +64,48 @@ impl eframe::App for BikeApp {
                 Tabs::Main => {}
                 Tabs::Workouts => {}
                 Tabs::Bluetooth => {
-                    if ui.button("Scan").clicked() {
-                        self.bt_adapters = bt_scan();
-                    }
-                    egui::ComboBox::from_label("Choose a peripheral.")
-                        .selected_text(&self.adapter_text)
-                        .show_ui(ui, |ui| match &self.bt_adapters {
-                            Some(adapters) => {
-                                for (i, adapter) in adapters.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        if ui.button("Adapter").clicked() {
+                            self.bt_adapters = bt_adapter_scan();
+                        }
+                        egui::ComboBox::from_label("Choose an adapter.")
+                            .selected_text(&self.adapter_text)
+                            .show_ui(ui, |ui| match &self.bt_adapters {
+                                Some(adapters) => {
+                                    for (i, adapter) in adapters.iter().enumerate() {
+                                        ui.selectable_value(
+                                            &mut self.selected_adapter_number,
+                                            Some(i),
+                                            adapter.identifier().unwrap(),
+                                        );
+                                    }
+                                }
+                                None => {
                                     ui.selectable_value(
                                         &mut self.selected_adapter_number,
-                                        Some(i),
-                                        adapter.identifier().unwrap(),
+                                        None,
+                                        "None",
                                     );
                                 }
+                            });
+                        // TODO: this shit sucks, IDK what to do here
+                        /*
+                        // update adapter variable based on selected number
+                        if self.selected_adapter_number.is_some() {
+                            self.selected_adapter = Some(
+                                self.bt_adapters.as_ref().unwrap()
+                                    [self.selected_adapter_number.clone().unwrap()]
+                                .clone(),
+                            );
+                        }
+                        */
+                        if ui.button("Scan").clicked() {
+                            if self.selected_adapter.is_some() {
+                                self.peripheral_list =
+                                    bt_scan(&mut self.selected_adapter.as_mut().unwrap());
                             }
-                            None => {
-                                ui.selectable_value(
-                                    &mut self.selected_adapter_number,
-                                    None,
-                                    "None",
-                                );
-                            }
-                        });
+                        }
+                    });
                 }
                 Tabs::Help => {}
             }
