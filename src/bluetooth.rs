@@ -24,7 +24,7 @@ pub fn bt_scan(adapter: &mut Pin<Box<Adapter>>) -> Option<Vec<Pin<Box<Peripheral
     }));
 
     adapter.scan_for(5000).unwrap();
-    println!("Scane complete.");
+    println!("Scan complete.");
 
     match adapter.scan_get_results() {
         Ok(peripherals) => return Some(peripherals),

@@ -33,6 +33,7 @@ pub struct BikeApp {
     adapter_text: String,
     peripheral_list: Option<Vec<Pin<Box<Peripheral>>>>,
     selected_peripheral_number: Option<usize>,
+    peripheral_text: String,
 }
 
 impl Default for BikeApp {
@@ -45,12 +46,25 @@ impl Default for BikeApp {
             adapter_text: "None selected".to_string(),
             peripheral_list: None,
             selected_peripheral_number: None,
+            peripheral_text: "None_selected".to_string(),
         }
     }
 }
 
 impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // update state
+        if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
+            self.adapter_text = update_adapter_text(
+                &self.bt_adapters.as_ref().unwrap()[self.selected_adapter_number.clone().unwrap()],
+            );
+        }
+        if self.peripheral_list.is_some() && self.selected_peripheral_number.is_some() {
+            self.peripheral_text = update_peripheral_text(
+                &self.peripheral_list.as_ref().unwrap()
+                    [self.selected_peripheral_number.clone().unwrap()],
+            );
+        }
         // main window
         egui::TopBottomPanel::top("Tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -76,7 +90,7 @@ impl eframe::App for BikeApp {
                                         ui.selectable_value(
                                             &mut self.selected_adapter_number,
                                             Some(i),
-                                            adapter.identifier().unwrap(),
+                                            adapter.identifier().unwrap().to_string(),
                                         );
                                     }
                                 }
@@ -99,16 +113,65 @@ impl eframe::App for BikeApp {
                             );
                         }
                         */
+                    });
+                    ui.horizontal(|ui| {
                         if ui.button("Scan").clicked() {
-                            if self.selected_adapter.is_some() {
-                                self.peripheral_list =
-                                    bt_scan(&mut self.selected_adapter.as_mut().unwrap());
+                            if self.selected_adapter_number.is_some() {
+                                println!("Scanning for devices...");
+                                self.peripheral_list = bt_scan(
+                                    &mut self.bt_adapters.as_mut().unwrap()
+                                        [self.selected_adapter_number.clone().unwrap()],
+                                );
                             }
-                        }
+                        };
+                        egui::ComboBox::from_label("Choose a device.")
+                            .selected_text(&self.peripheral_text)
+                            .show_ui(ui, |ui| match &self.peripheral_list {
+                                Some(peripherals) => {
+                                    for (i, peripheral) in peripherals.iter().enumerate() {
+                                        let name_str: String;
+                                        if peripheral.identifier().unwrap().is_empty() {
+                                            name_str = "Unknown device".to_string();
+                                        } else {
+                                            name_str = peripheral.identifier().unwrap();
+                                            // could put UID here or something?
+                                        }
+                                        ui.selectable_value(
+                                            &mut self.selected_peripheral_number,
+                                            Some(i),
+                                            name_str,
+                                        );
+                                    }
+                                }
+                                None => {
+                                    ui.selectable_value(
+                                        &mut self.selected_peripheral_number,
+                                        None,
+                                        "None",
+                                    );
+                                }
+                            });
                     });
                 }
                 Tabs::Help => {}
             }
         });
     }
+}
+
+/// update bluetooth adapter combobox text based on selection
+fn update_adapter_text(adapter: &Pin<Box<Adapter>>) -> String {
+    let adapter_str = adapter.identifier().unwrap().to_string();
+    return adapter_str;
+}
+
+/// update bluetooth peripheral combobox text based on selection
+fn update_peripheral_text(peripheral: &Pin<Box<Peripheral>>) -> String {
+    let peripheral_str: String;
+    if peripheral.identifier().unwrap().is_empty() {
+        peripheral_str = "Unknown device".to_string();
+    } else {
+        peripheral_str = peripheral.identifier().unwrap().to_string();
+    }
+    return peripheral_str;
 }
