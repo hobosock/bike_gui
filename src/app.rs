@@ -28,10 +28,11 @@ pub struct BikeApp {
     active_tab: Tabs,
     // bluetooth stuff
     bt_adapters: Option<Vec<Pin<Box<Adapter>>>>,
-    selected_adapter: Option<Pin<Box<Adapter>>>,
+    //selected_adapter: Option<Pin<Box<Adapter>>>,
     selected_adapter_number: Option<usize>,
     adapter_text: String,
     peripheral_list: Option<Vec<Pin<Box<Peripheral>>>>,
+    //selected_peripheral: Option<Pin<Box<Peripheral>>>,
     selected_peripheral_number: Option<usize>,
     peripheral_text: String,
 }
@@ -41,10 +42,11 @@ impl Default for BikeApp {
         Self {
             active_tab: Tabs::Main,
             bt_adapters: None,
-            selected_adapter: None,
+            //selected_adapter: None,
             selected_adapter_number: None,
             adapter_text: "None selected".to_string(),
             peripheral_list: None,
+            //selected_peripheral: None,
             selected_peripheral_number: None,
             peripheral_text: "None_selected".to_string(),
         }
@@ -58,12 +60,26 @@ impl eframe::App for BikeApp {
             self.adapter_text = update_adapter_text(
                 &self.bt_adapters.as_ref().unwrap()[self.selected_adapter_number.clone().unwrap()],
             );
+            /* this copies adapter/peripheral over to new field, but breaks on subsequent loops
+            self.selected_adapter = Some(
+                self.bt_adapters
+                    .as_mut()
+                    .unwrap()
+                    .remove(self.selected_adapter_number.clone().unwrap()),
+            );*/
         }
         if self.peripheral_list.is_some() && self.selected_peripheral_number.is_some() {
             self.peripheral_text = update_peripheral_text(
                 &self.peripheral_list.as_ref().unwrap()
                     [self.selected_peripheral_number.clone().unwrap()],
             );
+            /* this copies peripheral over to new field, but breaks on subsequent loops
+            self.selected_peripheral = Some(
+                self.peripheral_list
+                    .as_mut()
+                    .unwrap()
+                    .remove(self.selected_peripheral_number.clone().unwrap()),
+            );*/
         }
         // main window
         egui::TopBottomPanel::top("Tabs").show(ctx, |ui| {
@@ -102,17 +118,6 @@ impl eframe::App for BikeApp {
                                     );
                                 }
                             });
-                        // TODO: this shit sucks, IDK what to do here
-                        /*
-                        // update adapter variable based on selected number
-                        if self.selected_adapter_number.is_some() {
-                            self.selected_adapter = Some(
-                                self.bt_adapters.as_ref().unwrap()
-                                    [self.selected_adapter_number.clone().unwrap()]
-                                .clone(),
-                            );
-                        }
-                        */
                     });
                     ui.horizontal(|ui| {
                         if ui.button("Scan").clicked() {
@@ -151,6 +156,18 @@ impl eframe::App for BikeApp {
                                     );
                                 }
                             });
+                        if ui.button("Connect").clicked() {
+                            if self.selected_peripheral_number.is_some()
+                                && self.peripheral_list.is_some()
+                            {
+                                println!("Connecting to device...");
+                                // TODO: error handling here
+                                //let peripheral = self.peripheral_list.as_mut().unwrap()
+                                //    [self.selected_peripheral_number.clone().unwrap()];
+                            } else {
+                                println!("Please scan for devices and select one to connect.");
+                            }
+                        }
                     });
                 }
                 Tabs::Help => {}
