@@ -37,6 +37,7 @@ pub struct BikeApp {
     selected_peripheral_number: Option<usize>,
     peripheral_moved: bool,
     peripheral_text: String,
+    peripheral_connected: bool,
 }
 
 impl Default for BikeApp {
@@ -53,6 +54,7 @@ impl Default for BikeApp {
             selected_peripheral_number: None,
             peripheral_moved: false,
             peripheral_text: "None_selected".to_string(),
+            peripheral_connected: false,
         }
     }
 }
@@ -90,6 +92,12 @@ impl eframe::App for BikeApp {
                 self.peripheral_moved = true;
             }
         }
+        if self.peripheral_moved && self.selected_peripheral.is_some() {
+            match self.selected_peripheral.as_ref().unwrap().is_connected() {
+                Ok(flag) => self.peripheral_connected = flag,
+                Err(_) => {}
+            }
+        }
         // main window
         egui::TopBottomPanel::top("Tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -100,7 +108,24 @@ impl eframe::App for BikeApp {
             });
             ui.separator();
             match self.active_tab {
-                Tabs::Main => {}
+                Tabs::Main => {
+                    if self.peripheral_connected && self.selected_peripheral.is_some() {
+                        for service in self
+                            .selected_peripheral
+                            .as_ref()
+                            .unwrap()
+                            .services()
+                            .unwrap()
+                            .iter()
+                        {
+                            ui.add_sized(
+                                ui.available_size(),
+                                egui::TextEdit::singleline(&mut service.data()[0].to_string()),
+                            );
+                            println!("data length: {}", service.data().len());
+                        }
+                    }
+                }
                 Tabs::Workouts => {}
                 Tabs::Bluetooth => {
                     ui.horizontal(|ui| {
@@ -147,15 +172,6 @@ impl eframe::App for BikeApp {
                     });
                     ui.horizontal(|ui| {
                         if ui.button("Scan").clicked() {
-                            /*
-                            if self.selected_adapter_number.is_some() {
-                                println!("Scanning for devices...");
-                                self.peripheral_list = bt_scan(
-                                    &mut self.bt_adapters.as_mut().unwrap()
-                                        [self.selected_adapter_number.clone().unwrap()],
-                                );
-                            }
-                            */
                             if self.adapter_moved {
                                 println!("Scanning for devices...");
                                 self.peripheral_list =
@@ -209,9 +225,19 @@ impl eframe::App for BikeApp {
                         if ui.button("Connect").clicked() {
                             if self.peripheral_moved {
                                 println!("Connecting to device...");
-                                // TODO: error handling here
-                                //let peripheral = self.peripheral_list.as_mut().unwrap()
-                                //    [self.selected_peripheral_number.clone().unwrap()];
+                                self.selected_peripheral
+                                    .as_mut()
+                                    .unwrap()
+                                    .set_callback_on_connected(Box::new(|| {
+                                        println!("Connected to device.");
+                                    }));
+                                self.selected_peripheral
+                                    .as_mut()
+                                    .unwrap()
+                                    .set_callback_on_disconnected(Box::new(|| {
+                                        println!("Disconnected from device.");
+                                        //self.peripheral_connected = false;
+                                    }));
                             } else {
                                 println!("Please scan for devices and select one to connect.");
                             }
