@@ -222,6 +222,7 @@ impl eframe::App for BikeApp {
                                     }
                                 });
                         }
+                        println!("loop");
                         if ui.button("Connect").clicked() {
                             if self.peripheral_moved {
                                 println!("Connecting to device...");
@@ -266,3 +267,4 @@ fn update_peripheral_text(peripheral: &Pin<Box<Peripheral>>) -> String {
     }
     return peripheral_str;
 }
+
