@@ -1,3 +1,5 @@
+//#![cfg_attr(not(debug_assertions), window_subsystem = "windows")] // hide consolewindow on Windows
+
 /*=======================================================================
  * IMPORTS
  * ====================================================================*/
@@ -8,7 +10,6 @@ mod bluetooth;
 
 // external crates
 use eframe::egui;
-use simplersble;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
