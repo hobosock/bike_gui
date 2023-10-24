@@ -66,10 +66,13 @@ impl eframe::App for BikeApp {
         // update state
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
-                self.adapter_text = update_adapter_text(
-                    &self.bt_adapters.as_ref().unwrap()
-                        [self.selected_adapter_number.clone().unwrap()],
-                );
+                async {
+                    self.adapter_text = update_adapter_text(
+                        &self.bt_adapters.as_ref().unwrap()
+                            [self.selected_adapter_number.clone().unwrap()],
+                    )
+                    .await;
+                };
                 self.selected_adapter = Some(
                     self.bt_adapters
                         .as_mut()
@@ -96,7 +99,13 @@ impl eframe::App for BikeApp {
         }
         if self.peripheral_moved && self.selected_peripheral.is_some() {
             async {
-                match self.selected_peripheral.unwrap().is_connected().await {
+                match self
+                    .selected_peripheral
+                    .clone()
+                    .unwrap()
+                    .is_connected()
+                    .await
+                {
                     Ok(flag) => self.peripheral_connected = flag,
                     Err(_) => {}
                 }
@@ -117,7 +126,7 @@ impl eframe::App for BikeApp {
                     if self.peripheral_connected && self.selected_peripheral.is_some() {
                         async {
                             let peripheral = self.selected_peripheral.clone().unwrap();
-                            let discovered_services = peripheral.discover_services().await;
+                            peripheral.discover_services().await;
                             let characteristics = peripheral.characteristics();
                             for chars in characteristics.iter() {
                                 ui.add_sized(
@@ -138,7 +147,7 @@ impl eframe::App for BikeApp {
                         }
                         if self.adapter_moved {
                             async {
-                                let adapter_info_str = String::new();
+                                let adapter_info_str: String;
                                 match self.selected_adapter.clone().unwrap().adapter_info().await {
                                     Ok(info) => adapter_info_str = info,
                                     Err(e) => adapter_info_str = e.to_string(),
@@ -154,36 +163,43 @@ impl eframe::App for BikeApp {
                                     });
                             };
                         } else {
-                            async {
-                                egui::ComboBox::from_label("Choose an adapter.")
-                                    .selected_text(&self.adapter_text)
-                                    .show_ui(ui, |ui| match &self.bt_adapters {
-                                        Some(adapters) => {
-                                            for (i, adapter) in adapters.iter().enumerate() {
+                            egui::ComboBox::from_label("Choose an adapter.")
+                                .selected_text(&self.adapter_text)
+                                .show_ui(ui, |ui| match &self.bt_adapters {
+                                    Some(adapters) => {
+                                        for (i, adapter) in adapters.iter().enumerate() {
+                                            async {
+                                                let adapter_info_str: String;
+                                                match adapter.adapter_info().await {
+                                                    Ok(info) => adapter_info_str = info,
+                                                    Err(e) => adapter_info_str = e.to_string(),
+                                                }
                                                 ui.selectable_value(
                                                     &mut self.selected_adapter_number,
                                                     Some(i),
-                                                    adapter.identifier().unwrap().to_string(),
+                                                    adapter_info_str,
                                                 );
-                                            }
+                                            };
                                         }
-                                        None => {
-                                            ui.selectable_value(
-                                                &mut self.selected_adapter_number,
-                                                None,
-                                                "None",
-                                            );
-                                        }
-                                    });
-                            };
+                                    }
+                                    None => {
+                                        ui.selectable_value(
+                                            &mut self.selected_adapter_number,
+                                            None,
+                                            "None",
+                                        );
+                                    }
+                                });
                         }
                     });
                     ui.horizontal(|ui| {
                         if ui.button("Scan").clicked() {
                             if self.adapter_moved {
-                                println!("Scanning for devices...");
-                                self.peripheral_list =
-                                    bt_scan(&mut self.selected_adapter.as_mut().unwrap());
+                                async {
+                                    println!("Scanning for devices...");
+                                    self.peripheral_list =
+                                        bt_scan(&mut self.selected_adapter.as_mut().unwrap()).await;
+                                };
                             }
                         }
                         if self.peripheral_moved {
@@ -193,11 +209,7 @@ impl eframe::App for BikeApp {
                                     ui.selectable_value(
                                         &mut self.selected_peripheral_number,
                                         Some(0 as usize),
-                                        self.selected_peripheral
-                                            .as_ref()
-                                            .unwrap()
-                                            .identifier()
-                                            .unwrap(),
+                                        self.selected_peripheral.clone().unwrap().id().to_string(),
                                     );
                                 });
                         } else {
@@ -206,17 +218,10 @@ impl eframe::App for BikeApp {
                                 .show_ui(ui, |ui| match &self.peripheral_list {
                                     Some(peripherals) => {
                                         for (i, peripheral) in peripherals.iter().enumerate() {
-                                            let name_str: String;
-                                            if peripheral.identifier().unwrap().is_empty() {
-                                                name_str = "Unknown device".to_string();
-                                            } else {
-                                                name_str = peripheral.identifier().unwrap();
-                                                // could put UUID here or something?
-                                            }
                                             ui.selectable_value(
                                                 &mut self.selected_peripheral_number,
                                                 Some(i),
-                                                name_str,
+                                                peripheral.id().to_string(),
                                             );
                                         }
                                     }
@@ -232,9 +237,9 @@ impl eframe::App for BikeApp {
                         if ui.button("Connect").clicked() {
                             if self.peripheral_moved {
                                 println!("Connecting to device...");
+                            } else {
+                                println!("Please scan for devices and select one to connect");
                             }
-                        } else {
-                            println!("Please scan for devices and select one to connect");
                         }
                     });
                 }
@@ -245,18 +250,17 @@ impl eframe::App for BikeApp {
 }
 
 /// update bluetooth adapter combobox text based on selection
-fn update_adapter_text(adapter: &Adapter) -> String {
-    let adapter_str = adapter.identifier().unwrap().to_string();
+async fn update_adapter_text(adapter: &Adapter) -> String {
+    let adapter_str: String;
+    match adapter.adapter_info().await {
+        Ok(info) => adapter_str = info.to_string(),
+        Err(e) => adapter_str = e.to_string(),
+    }
     return adapter_str;
 }
 
 /// update bluetooth peripheral combobox text based on selection
 fn update_peripheral_text(peripheral: &Peripheral) -> String {
-    let peripheral_str: String;
-    if peripheral.identifier().unwrap().is_empty {
-        peripheral_str = "Unknown device".to_string();
-    } else {
-        peripheral_str = peripheral.identifier().unwrap().to_string();
-    }
+    let peripheral_str = peripheral.id().to_string();
     return peripheral_str;
 }
