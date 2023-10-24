@@ -5,6 +5,7 @@
 use crate::bluetooth::*;
 
 // external crates
+use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use eframe::egui;
 
 /*=======================================================================
@@ -25,8 +26,8 @@ pub struct BikeApp {
     // app state stuff
     active_tab: Tabs,
     // bluetooth stuff
-    bt_adapters: Vec<simplersble::Adapter>,
-    peripheral_list: Vec<simplersble::Peripheral>,
+    bt_adapters: Vec<Adapter>,
+    peripheral_list: Vec<Peripheral>,
 }
 
 impl Default for BikeApp {
@@ -55,7 +56,9 @@ impl eframe::App for BikeApp {
                 Tabs::Workouts => {}
                 Tabs::Bluetooth => {
                     if ui.button("Scan").clicked() {
-                        let adapter_options = bt_scan();
+                        if self.bt_adapters.len() >= 1 {
+                            let adapter_options = bt_scan();
+                        }
                     }
                     egui::ComboBox::from_label("Choose a peripheral.")
                 }
