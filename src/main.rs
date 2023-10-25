@@ -11,7 +11,8 @@ mod bluetooth;
 // external crates
 use eframe::egui;
 
-fn main() -> Result<(), eframe::Error> {
+#[tokio::main]
+async fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(500.0, 300.0)),
         ..Default::default()

@@ -70,11 +70,13 @@ pub async fn bt_adapter_scan() -> Option<Vec<Adapter>> {
 pub async fn bt_scan(adapter: &Adapter) -> Option<Vec<Peripheral>> {
     println!("Scanning for peripherals...");
     let scan_results = adapter.start_scan(ScanFilter::default()).await;
-    time::sleep(Duration::from_secs(10));
+    time::sleep(Duration::from_secs(10)).await;
+    println!("Here are the results:");
 
     match scan_results {
         Ok(()) => {
             let peripherals = adapter.peripherals().await.unwrap();
+            println!("{:?}", peripherals);
             return Some(peripherals);
         }
         Err(e) => {

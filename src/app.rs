@@ -5,6 +5,7 @@
 use crate::bluetooth::*;
 
 // external crates
+use async_std::task;
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Manager, Peripheral, PeripheralId},
@@ -66,13 +67,10 @@ impl eframe::App for BikeApp {
         // update state
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
-                async {
-                    self.adapter_text = update_adapter_text(
-                        &self.bt_adapters.as_ref().unwrap()
-                            [self.selected_adapter_number.clone().unwrap()],
-                    )
-                    .await;
-                };
+                self.adapter_text = task::block_on(update_adapter_text(
+                    &self.bt_adapters.as_ref().unwrap()
+                        [self.selected_adapter_number.clone().unwrap()],
+                ));
                 self.selected_adapter = Some(
                     self.bt_adapters
                         .as_mut()
@@ -98,18 +96,10 @@ impl eframe::App for BikeApp {
             }
         }
         if self.peripheral_moved && self.selected_peripheral.is_some() {
-            async {
-                match self
-                    .selected_peripheral
-                    .clone()
-                    .unwrap()
-                    .is_connected()
-                    .await
-                {
-                    Ok(flag) => self.peripheral_connected = flag,
-                    Err(_) => {}
-                }
-            };
+            match task::block_on(self.selected_peripheral.clone().unwrap().is_connected()) {
+                Ok(flag) => self.peripheral_connected = flag,
+                Err(_) => {}
+            }
         }
 
         // main window
@@ -124,62 +114,56 @@ impl eframe::App for BikeApp {
             match self.active_tab {
                 Tabs::Main => {
                     if self.peripheral_connected && self.selected_peripheral.is_some() {
-                        async {
-                            let peripheral = self.selected_peripheral.clone().unwrap();
-                            peripheral.discover_services().await;
-                            let characteristics = peripheral.characteristics();
-                            for chars in characteristics.iter() {
-                                ui.add_sized(
-                                    ui.available_size(),
-                                    egui::TextEdit::singleline(&mut chars.uuid.to_string()),
-                                );
-                            }
-                        };
+                        let peripheral = self.selected_peripheral.clone().unwrap();
+                        let _ = task::block_on(peripheral.discover_services());
+                        let characteristics = peripheral.characteristics();
+                        for chars in characteristics.iter() {
+                            ui.add_sized(
+                                ui.available_size(),
+                                egui::TextEdit::singleline(&mut chars.uuid.to_string()),
+                            );
+                        }
                     }
                 }
                 Tabs::Workouts => {}
                 Tabs::Bluetooth => {
                     ui.horizontal(|ui| {
                         if ui.button("Adapter").clicked() {
-                            async {
-                                self.bt_adapters = bt_adapter_scan().await;
-                            };
+                            self.bt_adapters = task::block_on(bt_adapter_scan());
                         }
                         if self.adapter_moved {
-                            async {
-                                let adapter_info_str: String;
-                                match self.selected_adapter.clone().unwrap().adapter_info().await {
-                                    Ok(info) => adapter_info_str = info,
-                                    Err(e) => adapter_info_str = e.to_string(),
-                                }
-                                egui::ComboBox::from_label("Choose an adapter.")
-                                    .selected_text(&self.adapter_text)
-                                    .show_ui(ui, |ui| {
-                                        ui.selectable_value(
-                                            &mut self.selected_adapter_number,
-                                            Some(0 as usize),
-                                            adapter_info_str,
-                                        );
-                                    });
-                            };
+                            let adapter_info_str: String;
+                            match task::block_on(
+                                self.selected_adapter.clone().unwrap().adapter_info(),
+                            ) {
+                                Ok(info) => adapter_info_str = info,
+                                Err(e) => adapter_info_str = e.to_string(),
+                            }
+                            egui::ComboBox::from_label("Choose an adapter.")
+                                .selected_text(&self.adapter_text)
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.selected_adapter_number,
+                                        Some(0 as usize),
+                                        adapter_info_str,
+                                    );
+                                });
                         } else {
                             egui::ComboBox::from_label("Choose an adapter.")
                                 .selected_text(&self.adapter_text)
                                 .show_ui(ui, |ui| match &self.bt_adapters {
                                     Some(adapters) => {
                                         for (i, adapter) in adapters.iter().enumerate() {
-                                            async {
-                                                let adapter_info_str: String;
-                                                match adapter.adapter_info().await {
-                                                    Ok(info) => adapter_info_str = info,
-                                                    Err(e) => adapter_info_str = e.to_string(),
-                                                }
-                                                ui.selectable_value(
-                                                    &mut self.selected_adapter_number,
-                                                    Some(i),
-                                                    adapter_info_str,
-                                                );
-                                            };
+                                            let adapter_info_str: String;
+                                            match task::block_on(adapter.adapter_info()) {
+                                                Ok(info) => adapter_info_str = info,
+                                                Err(e) => adapter_info_str = e.to_string(),
+                                            }
+                                            ui.selectable_value(
+                                                &mut self.selected_adapter_number,
+                                                Some(i),
+                                                adapter_info_str,
+                                            );
                                         }
                                     }
                                     None => {
@@ -195,11 +179,10 @@ impl eframe::App for BikeApp {
                     ui.horizontal(|ui| {
                         if ui.button("Scan").clicked() {
                             if self.adapter_moved {
-                                async {
-                                    println!("Scanning for devices...");
-                                    self.peripheral_list =
-                                        bt_scan(&mut self.selected_adapter.as_mut().unwrap()).await;
-                                };
+                                println!("Scanning for devices...");
+                                self.peripheral_list = task::block_on(bt_scan(
+                                    &mut self.selected_adapter.as_mut().unwrap(),
+                                ));
                             }
                         }
                         if self.peripheral_moved {
@@ -237,6 +220,17 @@ impl eframe::App for BikeApp {
                         if ui.button("Connect").clicked() {
                             if self.peripheral_moved {
                                 println!("Connecting to device...");
+                                match task::block_on(
+                                    self.selected_peripheral.clone().unwrap().connect(),
+                                ) {
+                                    Ok(()) => {
+                                        println!("Device connected.");
+                                        self.peripheral_connected = true;
+                                    }
+                                    Err(e) => {
+                                        println!("Failed to connect.  {:?}", e);
+                                    }
+                                }
                             } else {
                                 println!("Please scan for devices and select one to connect");
                             }
