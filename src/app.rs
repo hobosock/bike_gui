@@ -2,7 +2,7 @@
  * IMPORTS
  * ====================================================================*/
 // local files
-use crate::bluetooth::*;
+use crate::bluetooth::{ble_default_services::SPECIAL_SERVICES_NAMES, *};
 
 // external crates
 use async_std::task;
@@ -11,6 +11,7 @@ use btleplug::{
     platform::{Adapter, Manager, Peripheral, PeripheralId},
 };
 use eframe::egui;
+use uuid::Uuid;
 
 /*=======================================================================
  * ENUMS
@@ -118,10 +119,8 @@ impl eframe::App for BikeApp {
                         let _ = task::block_on(peripheral.discover_services());
                         let characteristics = peripheral.characteristics();
                         for chars in characteristics.iter() {
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::TextEdit::singleline(&mut chars.uuid.to_string()),
-                            );
+                            let name = SPECIAL_SERVICES_NAMES.get(&Uuid::from_u128(chars.uuid));
+                            ui.add(egui::TextEdit::singleline(&mut name));
                         }
                     }
                 }
