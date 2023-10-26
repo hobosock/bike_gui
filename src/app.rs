@@ -218,12 +218,8 @@ impl eframe::App for BikeApp {
                                     Some(peripherals) => {
                                         for (i, peripheral) in peripherals.iter().enumerate() {
                                             let mut name_str = peripheral.id().to_string();
-                                            let properties_result = task::block_on(
-                                                self.selected_peripheral
-                                                    .clone()
-                                                    .unwrap()
-                                                    .properties(),
-                                            );
+                                            let properties_result =
+                                                task::block_on(peripheral.properties());
                                             match properties_result {
                                                 Ok(prop_option) => {
                                                     if prop_option.is_some() {
