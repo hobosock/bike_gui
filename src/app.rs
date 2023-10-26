@@ -186,13 +186,29 @@ impl eframe::App for BikeApp {
                             }
                         }
                         if self.peripheral_moved {
+                            let mut name_str =
+                                self.selected_peripheral.clone().unwrap().id().to_string();
+                            let properties_result = task::block_on(
+                                self.selected_peripheral.clone().unwrap().properties(),
+                            );
+                            match properties_result {
+                                Ok(prop_option) => {
+                                    if prop_option.is_some() {
+                                        if prop_option.clone().unwrap().local_name.is_some() {
+                                            name_str =
+                                                prop_option.clone().unwrap().local_name.unwrap();
+                                        }
+                                    }
+                                }
+                                Err(_) => {}
+                            }
                             egui::ComboBox::from_label("Choose a device.")
                                 .selected_text(&self.peripheral_text)
                                 .show_ui(ui, |ui| {
                                     ui.selectable_value(
                                         &mut self.selected_peripheral_number,
                                         Some(0 as usize),
-                                        self.selected_peripheral.clone().unwrap().id().to_string(),
+                                        name_str,
                                     );
                                 });
                         } else {
@@ -201,10 +217,36 @@ impl eframe::App for BikeApp {
                                 .show_ui(ui, |ui| match &self.peripheral_list {
                                     Some(peripherals) => {
                                         for (i, peripheral) in peripherals.iter().enumerate() {
+                                            let mut name_str = peripheral.id().to_string();
+                                            let properties_result = task::block_on(
+                                                self.selected_peripheral
+                                                    .clone()
+                                                    .unwrap()
+                                                    .properties(),
+                                            );
+                                            match properties_result {
+                                                Ok(prop_option) => {
+                                                    if prop_option.is_some() {
+                                                        if prop_option
+                                                            .clone()
+                                                            .unwrap()
+                                                            .local_name
+                                                            .is_some()
+                                                        {
+                                                            name_str = prop_option
+                                                                .clone()
+                                                                .unwrap()
+                                                                .local_name
+                                                                .unwrap();
+                                                        }
+                                                    }
+                                                }
+                                                Err(_) => {}
+                                            }
                                             ui.selectable_value(
                                                 &mut self.selected_peripheral_number,
                                                 Some(i),
-                                                peripheral.id().to_string(),
+                                                name_str,
                                             );
                                         }
                                     }
