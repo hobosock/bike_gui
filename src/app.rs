@@ -119,7 +119,14 @@ impl eframe::App for BikeApp {
                         let _ = task::block_on(peripheral.discover_services());
                         let characteristics = peripheral.characteristics();
                         for chars in characteristics.iter() {
-                            let name = SPECIAL_SERVICES_NAMES.get(&Uuid::from_u128(chars.uuid));
+                            let name_result = SPECIAL_SERVICES_NAMES.get(&chars.uuid);
+                            let mut name: String;
+                            if name_result.is_some() {
+                                name = name_result.unwrap().to_string();
+                            } else {
+                                name = chars.uuid.to_string();
+                            }
+                            println!("{:?}", name);
                             ui.add(egui::TextEdit::singleline(&mut name));
                         }
                     }
