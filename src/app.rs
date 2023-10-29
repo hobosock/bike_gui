@@ -2,7 +2,10 @@
  * IMPORTS
  * ====================================================================*/
 // local files
-use crate::bluetooth::{ble_default_services::SPECIAL_SERVICES_NAMES, *};
+use crate::bluetooth::{
+    ble_default_services::SPECIAL_CHARACTERISTICS_NAMES,
+    ble_default_services::SPECIAL_SERVICES_NAMES, *,
+};
 
 // external crates
 use async_std::task;
@@ -119,15 +122,14 @@ impl eframe::App for BikeApp {
                         let _ = task::block_on(peripheral.discover_services());
                         let characteristics = peripheral.characteristics();
                         for chars in characteristics.iter() {
-                            let name_result = SPECIAL_SERVICES_NAMES.get(&chars.uuid);
+                            let name_result = SPECIAL_CHARACTERISTICS_NAMES.get(&chars.uuid);
                             let mut name: String;
                             if name_result.is_some() {
                                 name = name_result.unwrap().to_string();
                             } else {
                                 name = chars.uuid.to_string();
                             }
-                            println!("{:?}", name);
-                            ui.add(egui::TextEdit::singleline(&mut name));
+                            ui.text_edit_singleline(&mut name);
                         }
                     }
                 }
