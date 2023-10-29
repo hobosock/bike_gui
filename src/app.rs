@@ -14,6 +14,7 @@ use btleplug::{
     platform::{Adapter, Manager, Peripheral, PeripheralId},
 };
 use eframe::egui;
+use std::str;
 use uuid::Uuid;
 
 /*=======================================================================
@@ -129,7 +130,22 @@ impl eframe::App for BikeApp {
                             } else {
                                 name = chars.uuid.to_string();
                             }
-                            ui.text_edit_singleline(&mut name);
+                            let read_result = task::block_on(peripheral.read(chars));
+                            let mut value: String;
+                            match read_result {
+                                Ok(buf) => {
+                                    let s = match str::from_utf8(&buf) {
+                                        Ok(v) => v.to_string(),
+                                        Err(e) => e.to_string(),
+                                    };
+                                    value = s;
+                                }
+                                Err(e) => value = e.to_string(),
+                            }
+                            ui.horizontal(|ui| {
+                                ui.text_edit_singleline(&mut name);
+                                ui.text_edit_singleline(&mut value);
+                            });
                         }
                     }
                 }
