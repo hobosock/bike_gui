@@ -7,6 +7,7 @@
 use app::*;
 mod app;
 mod bluetooth;
+mod zwo_reader;
 
 // external crates
 use eframe::egui;
