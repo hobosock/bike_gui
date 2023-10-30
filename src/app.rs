@@ -13,8 +13,9 @@ use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Manager, Peripheral, PeripheralId},
 };
-use eframe::egui;
-use std::str;
+use eframe::egui::{self, Ui};
+use egui_file::FileDialog;
+use std::{path::PathBuf, str};
 use uuid::Uuid;
 
 /*=======================================================================
@@ -46,6 +47,9 @@ pub struct BikeApp {
     peripheral_moved: bool,
     peripheral_text: String,
     peripheral_connected: bool,
+    // workout file stuff
+    workout_file: Option<PathBuf>,
+    workout_file_dialog: Option<FileDialog>,
 }
 
 impl Default for BikeApp {
@@ -63,6 +67,8 @@ impl Default for BikeApp {
             peripheral_moved: false,
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
+            workout_file: None,
+            workout_file_dialog: None,
         }
     }
 }
@@ -149,7 +155,9 @@ impl eframe::App for BikeApp {
                         }
                     }
                 }
-                Tabs::Workouts => {}
+                Tabs::Workouts => {
+                    draw_workout_tab(ctx, ui, self);
+                }
                 Tabs::Bluetooth => {
                     ui.horizontal(|ui| {
                         if ui.button("Adapter").clicked() {
@@ -319,4 +327,30 @@ async fn update_adapter_text(adapter: &Adapter) -> String {
 fn update_peripheral_text(peripheral: &Peripheral) -> String {
     let peripheral_str = peripheral.id().to_string();
     return peripheral_str;
+}
+
+/// draws the workout tabe
+fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) {
+    ui.horizontal(|ui| {
+        ui.label("Workout:");
+        // TODO: make this a text box so you can manually enter the file path???
+        if let Some(workout_file) = &app_struct.workout_file {
+            ui.label(format!("{:?}", workout_file));
+        } else {
+            ui.label("None");
+        }
+        if ui.button("Open").clicked() {
+            let mut dialog = FileDialog::open_file(app_struct.workout_file.clone());
+            dialog.open();
+            app_struct.workout_file_dialog = Some(dialog);
+        }
+        if let Some(dialog) = &mut app_struct.workout_file_dialog {
+            if dialog.show(ctx).selected() {
+                if let Some(file) = dialog.path() {
+                    app_struct.workout_file = Some(file);
+                    // TODO: maybe actually load the file here?
+                }
+            }
+        }
+    });
 }
