@@ -2,21 +2,21 @@
  * IMPORTS
  * ====================================================================*/
 // local files
-use crate::bluetooth::{
-    ble_default_services::SPECIAL_CHARACTERISTICS_NAMES,
-    ble_default_services::SPECIAL_SERVICES_NAMES, *,
-};
+use crate::bluetooth::ble_default_services::SPECIAL_CHARACTERISTICS_NAMES;
+use crate::bluetooth::{bt_adapter_scan, bt_scan};
+use crate::zwo_reader::zwo_parse::file_to_text;
+use crate::zwo_reader::{self, zwo_read, Workout};
 
 // external crates
 use async_std::task;
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
-    platform::{Adapter, Manager, Peripheral, PeripheralId},
+    platform::{Adapter, Peripheral},
 };
 use eframe::egui::{self, Ui};
 use egui_file::FileDialog;
 use std::{path::PathBuf, str};
-use uuid::Uuid;
+//use uuid::Uuid;
 
 /*=======================================================================
  * ENUMS
@@ -29,7 +29,8 @@ enum Tabs {
     Help,
 }
 
-/*=======================================================================
+/*=======================
+ * ================================================
  * STRUCTS
  * ====================================================================*/
 pub struct BikeApp {
@@ -50,6 +51,7 @@ pub struct BikeApp {
     // workout file stuff
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
+    workout: Option<Workout>,
 }
 
 impl Default for BikeApp {
@@ -69,6 +71,7 @@ impl Default for BikeApp {
             peripheral_connected: false,
             workout_file: None,
             workout_file_dialog: None,
+            workout: None,
         }
     }
 }
@@ -349,6 +352,17 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                 if let Some(file) = dialog.path() {
                     app_struct.workout_file = Some(file);
                     // TODO: maybe actually load the file here?
+                }
+            }
+        }
+        // separate load button for now, worry about it later
+        if ui.button("Load").clicked() {
+            // TODO: zwo read function here
+            if app_struct.workout_file.is_some() {
+                let filepath = app_struct.workout_file.clone().unwrap();
+                match zwo_read(filepath) {
+                    Ok(workout) => app_struct.workout = Some(workout),
+                    Err(e) => println!("{:?}", e),
                 }
             }
         }
