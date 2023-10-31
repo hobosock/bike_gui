@@ -332,7 +332,7 @@ fn update_peripheral_text(peripheral: &Peripheral) -> String {
     return peripheral_str;
 }
 
-/// draws the workout tabe
+/// draws the workout tab
 fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) {
     ui.horizontal(|ui| {
         ui.label("Workout:");

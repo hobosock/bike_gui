@@ -27,15 +27,12 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
 
     for i in 0..chunk_sort.len() {
         // process each portion of the file
-        println!("--------------------------------------------------------------------------");
-        println!("{}", chunk_sort[i]);
         let partial_str: String;
         if i == chunk_sort.len() - 1 {
             partial_str = get_substr(&file_contents, chunk_sort[i], file_contents.len());
         } else {
             partial_str = get_substr(&file_contents, chunk_sort[i], chunk_sort[i + 1]);
         }
-        println!("partial_str: {}", partial_str);
 
         let mut tag_type: Option<ExerciseTag> = None;
 
@@ -51,7 +48,6 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
                 None => tag_type = None,
             }
         }
-        println!("tag_type: {:?}", tag_type);
 
         // process text based on the exercise type
         if tag_type.is_some() {
@@ -61,7 +57,6 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
                     if end_pos.is_some() {
                         let warmup_str = get_substr(&partial_str, 0, end_pos.unwrap());
                         let warmup_struct = get_properties_warmup(&warmup_str);
-                        println!("{:?}", warmup_struct);
                         workout.push(ExerciseTag::Warmup(warmup_struct));
                     }
                 }
@@ -70,7 +65,6 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
                     if end_pos.is_some() {
                         let steady_state_str = get_substr(&partial_str, 0, end_pos.unwrap());
                         let steady_state_struct = get_properties_steady_state(&steady_state_str);
-                        println!("{:?}", steady_state_struct);
                         workout.push(ExerciseTag::SteadyState(steady_state_struct));
                     }
                 }
@@ -79,7 +73,6 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
                     if end_pos.is_some() {
                         let cooldown_str = get_substr(&partial_str, 0, end_pos.unwrap());
                         let cooldown_struct = get_properties_cooldown(&cooldown_str);
-                        println!("{:?}", cooldown_struct);
                         workout.push(ExerciseTag::Cooldown(cooldown_struct));
                     }
                 }
@@ -147,7 +140,6 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
                 None => text_tag_type = None,
             }
         }
-        println!("tag_type: {:?}", text_tag_type);
 
         // process text based on the text event type
         if text_tag_type.is_some() {
