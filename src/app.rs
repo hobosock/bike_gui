@@ -127,39 +127,7 @@ impl eframe::App for BikeApp {
             ui.separator();
             match self.active_tab {
                 Tabs::Main => {
-                    if self.peripheral_connected && self.selected_peripheral.is_some() {
-                        let peripheral = self.selected_peripheral.clone().unwrap();
-                        let _ = task::block_on(peripheral.discover_services());
-                        let characteristics = peripheral.characteristics();
-                        for chars in characteristics.iter() {
-                            let name_result = SPECIAL_CHARACTERISTICS_NAMES.get(&chars.uuid);
-                            let mut name: String;
-                            if name_result.is_some() {
-                                name = name_result.unwrap().to_string();
-                            } else {
-                                name = chars.uuid.to_string();
-                            }
-                            let read_result = task::block_on(peripheral.read(chars));
-                            let mut value: String;
-                            match read_result {
-                                Ok(buf) => {
-                                    /*
-                                    let s = match str::from_utf8(&buf) {
-                                        Ok(v) => v.to_string(),
-                                        Err(e) => e.to_string(),
-                                    };
-                                    value = s;
-                                    */
-                                    value = String::from_utf8_lossy(&buf).into_owned();
-                                }
-                                Err(e) => value = e.to_string(),
-                            }
-                            ui.horizontal(|ui| {
-                                ui.text_edit_singleline(&mut name);
-                                ui.text_edit_singleline(&mut value);
-                            });
-                        }
-                    }
+                    draw_main_tab(ui, self);
                 }
                 Tabs::Workouts => {
                     draw_workout_tab(ctx, ui, self);
@@ -187,6 +155,43 @@ async fn update_adapter_text(adapter: &Adapter) -> String {
 fn update_peripheral_text(peripheral: &Peripheral) -> String {
     let peripheral_str = peripheral.id().to_string();
     return peripheral_str;
+}
+
+/// draws the main tab
+fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
+    if app_struct.peripheral_connected && app_struct.selected_peripheral.is_some() {
+        let peripheral = app_struct.selected_peripheral.clone().unwrap();
+        let _ = task::block_on(peripheral.discover_services());
+        let characteristics = peripheral.characteristics();
+        for chars in characteristics.iter() {
+            let name_result = SPECIAL_CHARACTERISTICS_NAMES.get(&chars.uuid);
+            let mut name: String;
+            if name_result.is_some() {
+                name = name_result.unwrap().to_string();
+            } else {
+                name = chars.uuid.to_string();
+            }
+            let read_result = task::block_on(peripheral.read(chars));
+            let mut value: String;
+            match read_result {
+                Ok(buf) => {
+                    /*
+                    let s = match str::from_utf8(&buf) {
+                        Ok(v) => v.to_string(),
+                        Err(e) => e.to_string(),
+                    };
+                    value = s;
+                    */
+                    value = String::from_utf8_lossy(&buf).into_owned();
+                }
+                Err(e) => value = e.to_string(),
+            }
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut name);
+                ui.text_edit_singleline(&mut value);
+            });
+        }
+    }
 }
 
 /// draws the workout tab
@@ -356,6 +361,17 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 }
             } else {
                 println!("Please scan for devices and select one to connect");
+            }
+        }
+        if ui.button("Disconnect").clicked() {
+            if app_struct.selected_peripheral.is_some() {
+                println!("Disconnecting from device...");
+                let peripheral = app_struct.selected_peripheral.clone().unwrap();
+                let disconnect_result = task::block_on(peripheral.disconnect());
+                match disconnect_result {
+                    Ok(()) => println!("Successfully disconnected."),
+                    Err(e) => println!("Failed to disconnect: {:?}", e),
+                }
             }
         }
     });
