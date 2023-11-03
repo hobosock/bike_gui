@@ -1,14 +1,8 @@
 /*=======================================================================
  * IMPORTS
  * ====================================================================*/
-use btleplug::api::{
-    BDAddr, Central, CharPropFlags, Manager as Manager_api, Peripheral as Peripheral_api,
-    ScanFilter,
-};
-use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
-use std::borrow::Cow;
-use std::pin::Pin;
-use std::sync::Arc;
+use btleplug::api::{Central, Manager as Manager_api, Peripheral as Peripheral_api, ScanFilter};
+use btleplug::platform::{Adapter, Manager, Peripheral};
 use std::time::Duration;
 use tokio::time::{self, sleep, timeout};
 
