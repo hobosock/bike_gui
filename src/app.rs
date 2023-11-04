@@ -5,18 +5,27 @@
 use crate::bluetooth::ble_default_services::SPECIAL_CHARACTERISTICS_NAMES;
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_parse::file_to_text;
-use crate::zwo_reader::{self, zwo_read, Workout};
+use crate::zwo_reader::{zwo_read, Workout};
 
 // external crates
 use async_std::task;
+use btleplug::api::{Characteristic, WriteType};
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Peripheral},
 };
 use eframe::egui::{self, Ui};
 use egui_file::FileDialog;
-use std::{path::PathBuf, str};
-//use uuid::Uuid;
+use std::path::PathBuf;
+use uuid::{uuid, Uuid};
+
+/*=======================================================================
+ * CONSTANTS
+ * ====================================================================*/
+// shots in the dark
+const CHAR_ID1: Uuid = uuid!("00002a00-0000-1000-8000-00805f9b34fb");
+const CHAR_ID2: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb");
+const CHAR_ID3: Uuid = uuid!("00002a00-0000-1000-8000-00805f9b34fb");
 
 /*=======================================================================
  * ENUMS
@@ -29,8 +38,7 @@ enum Tabs {
     Help,
 }
 
-/*=======================
- * ================================================
+/*=======================================================================
  * STRUCTS
  * ====================================================================*/
 pub struct BikeApp {
@@ -52,6 +60,9 @@ pub struct BikeApp {
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
     workout: Option<Workout>,
+    // Main/testing stuff
+    resistance_text: String,
+    resistance_value: u8,
 }
 
 impl Default for BikeApp {
@@ -72,6 +83,8 @@ impl Default for BikeApp {
             workout_file: None,
             workout_file_dialog: None,
             workout: None,
+            resistance_text: "0".to_string(),
+            resistance_value: 0,
         }
     }
 }
@@ -114,6 +127,12 @@ impl eframe::App for BikeApp {
                 Ok(flag) => self.peripheral_connected = flag,
                 Err(_) => {}
             }
+        }
+
+        // parse text boxes
+        match self.resistance_text.parse::<u8>() {
+            Ok(value) => self.resistance_value = value,
+            Err(_) => self.resistance_value = 0,
         }
 
         // main window
@@ -163,6 +182,51 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         let peripheral = app_struct.selected_peripheral.clone().unwrap();
         let _ = task::block_on(peripheral.discover_services());
         let characteristics = peripheral.characteristics();
+        let cmd_value = vec![app_struct.resistance_value];
+        let cmd_char1 = characteristics.iter().find(|c| c.uuid == CHAR_ID1);
+        let cmd_char2 = characteristics.iter().find(|c| c.uuid == CHAR_ID2);
+        let cmd_char3 = characteristics.iter().find(|c| c.uuid == CHAR_ID3);
+
+        ui.horizontal(|ui| {
+            ui.text_edit_singleline(&mut app_struct.resistance_text);
+            if ui.button("Try 1").clicked() {
+                if cmd_char1.is_some() {
+                    let write_result1 = task::block_on(peripheral.write(
+                        cmd_char1.unwrap(),
+                        &cmd_value,
+                        WriteType::WithoutResponse,
+                    ));
+                    println!("{:?}", write_result1);
+                } else {
+                    println!("CHAR_ID1 not found!");
+                }
+            }
+            if ui.button("Try 2").clicked() {
+                if cmd_char2.is_some() {
+                    let write_result2 = task::block_on(peripheral.write(
+                        cmd_char2.unwrap(),
+                        &cmd_value,
+                        WriteType::WithoutResponse,
+                    ));
+                    println!("{:?}", write_result2);
+                } else {
+                    println!("CHAR_ID2 not found!");
+                }
+            }
+            if ui.button("Try 3").clicked() {
+                if cmd_char3.is_some() {
+                    let write_result3 = task::block_on(peripheral.write(
+                        cmd_char3.unwrap(),
+                        &cmd_value,
+                        WriteType::WithoutResponse,
+                    ));
+                    println!("{:?}", write_result3);
+                } else {
+                    println!("CHAR_ID3 not found!");
+                }
+            }
+        });
+
         for chars in characteristics.iter() {
             let name_result = SPECIAL_CHARACTERISTICS_NAMES.get(&chars.uuid);
             let mut name: String;
