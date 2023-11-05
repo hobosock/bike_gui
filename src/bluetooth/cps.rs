@@ -2,9 +2,10 @@
  * IMPORTS
  * ====================================================================*/
 // external crates
+use proc_bitfield::{self, bitfield};
 use uuid::{uuid, Uuid};
 
-/*=======================================================================
+/*======================================================@=================
  * CONSTANTS
  * ====================================================================*/
 pub const CPS_POWER_MEASUREMENT: Uuid = uuid!("00002a63-0000-1000-8000-00805f9b34fb");
@@ -15,20 +16,22 @@ pub const CPS_CONTROL_POINT: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb"
 /*=======================================================================
  * STRUCTS
  * ====================================================================*/
-pub struct CpsFlag {
-    pub pedal_power_balance_present: bool,
-    pub pedal_power_balance_reference: bool,
-    pub accumulated_torque_present: bool,
-    pub accumulated_torque_source: bool,
-    pub wheel_revolution_data_present: bool,
-    pub crank_revolution_data_present: bool,
-    pub extreme_force_magnitudes_present: bool,
-    pub extreme_torque_magnitudes_present: bool,
-    pub extreme_angles_present: bool,
-    pub top_dead_spot_angle_present: bool,
-    pub bottom_dead_spot_angle_present: bool,
-    pub accumulated_energy_present: bool,
-    pub offset_compensation_indicator: bool,
+bitfield! {
+    pub struct CpsFlag(u16): Debug {
+        pub pedal_power_balance_present: bool @ 0,
+        pub pedal_power_balance_reference: bool @ 1,
+        pub accumulated_torque_present: bool @ 2,
+        pub accumulated_torque_source: bool @ 3,
+        pub wheel_revolution_data_present: bool @ 4,
+        pub crank_revolution_data_present: bool @ 5,
+        pub extreme_force_magnitudes_present: bool @ 6,
+        pub extreme_torque_magnitudes_present: bool @ 7,
+        pub extreme_angles_present: bool @ 8,
+        pub top_dead_spot_angle_present: bool @ 9,
+        pub bottom_dead_spot_angle_present: bool @ 10,
+        pub accumulated_energy_present: bool @ 11,
+        pub offset_compensation_indicator: bool @ 12,
+    }
 }
 
 /*=======================================================================

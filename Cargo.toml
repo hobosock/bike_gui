@@ -14,3 +14,4 @@ tokio = {version = "1.28", features = ["full"] }
 uuid = "1.3.4"
 lazy_static = "1.4.0"
 async-std = "1.12.0"
+proc-bitfield = "0.3.0"
