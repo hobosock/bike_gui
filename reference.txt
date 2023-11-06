@@ -1,0 +1,16 @@
+REFERENCE PROJECTS
+https://blog.lazerwalker.com/2019/02/15/bike-game-part-2.html
+https://ihaque.org/posts/2021/01/04/pelomon-part-iv-software/
+https://jjmtaylor.com/post/fitness-machine-service-ftms/
+
+USEFUL CODEBASES
+https://github.com/zacharyedwardbull/pycycling
+https://github.com/dvmarinoff/Flux
+https://github.com/dmtrKovalenko/blendr
+
+SPECIFICATIONS
+https://jjmtaylor.com/post/fitness-machine-service-ftms/
+https://bluetoothle.wiki/gatt
+https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/
+https://www.bluetooth.com/specifications/specs/cycling-power-profile-1-1/
+https://www.bluetooth.com/specifications/specs/cycling-speed-and-cadence-service-1-0/
