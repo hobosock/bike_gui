@@ -16,6 +16,39 @@ pub const CPS_CONTROL_POINT: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb"
 /*=======================================================================
  * STRUCTS
  * ====================================================================*/
+
+// Cycling Power Feature [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.4)
+// Table 4.5 AND Table 4.6???
+bitfield! {
+    pub struct CpsFeature(u32): Debug {
+        pub pedal_power_balance_supported: bool @ 0,
+        pub accumulated_torque_supported: bool @ 1,
+        pub wheel_revolution_data_supported: bool @ 2,
+        pub crank_revolution_data_supported: bool @ 3,
+        pub extreme_magnitudes_supported: bool @ 4,
+        pub extreme_angles_supported: bool @ 5,
+        pub dead_spot_angles_supported: bool @ 6,
+        pub accumulated_energy_supported: bool @ 7,
+        pub offset_compensation_indicator_supported: bool @ 8,
+        pub sensor_measurement_context_0: bool @ 9,
+        pub sensor_measurement_context_1: bool @ 10,
+        pub instantaneous_measurement_direction_supported: bool @ 11,
+        pub offset_compensation_supported: bool @ 12,
+        pub cycling_power_measurement_characteristic_content_masking_supported: bool @ 13,
+        pub multiple_sensor_locations_supported: bool @ 14,
+        pub crank_length_adjustment_supported: bool @ 15,
+        pub chain_length_adjustment_supported: bool @ 16,
+        pub chain_weight_adjustment_supported: bool @ 17,
+        pub span_length_adjustment_supported: bool @ 18,
+        pub factory_calibration_date_supported: bool @ 19,
+        pub enhanced_offset_compensation_supported: bool @ 20,
+    }
+}
+
+// Cycling Power Measurement [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.5)
+// Cycling Power Control Point [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.7)
+// Mask Cycling Power Measurement Characteristic Content Procedure (4.7.2.13)
+
 bitfield! {
     pub struct CpsFlag(u16): Debug {
         pub pedal_power_balance_present: bool @ 0,
