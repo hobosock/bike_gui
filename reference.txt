@@ -7,6 +7,11 @@ USEFUL CODEBASES
 https://github.com/zacharyedwardbull/pycycling
 https://github.com/dvmarinoff/Flux
 https://github.com/dmtrKovalenko/blendr
+https://github.com/Tschucker/ArduinoBLE-Cycle-Power-Service
+https://www.bluetooth.com/blog/part-2-the-wheels-on-the-bike-are-bluetooth-smart-bluetooth-smart-bluetooth-smart/
+https://github.com/ptx2/gymnasticon/tree/main
+https://github.com/paixaop/zwack
+https://os.mbed.com/users/p3miya/code/BLE_CyclingPower/file/d9d7edb1ddfc/CyclingPowerService.h/
 
 SPECIFICATIONS
 https://jjmtaylor.com/post/fitness-machine-service-ftms/
