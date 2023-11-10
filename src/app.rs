@@ -3,6 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::ble_default_services::SPECIAL_CHARACTERISTICS_NAMES;
+use crate::bluetooth::cps::*;
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_parse::file_to_text;
 use crate::zwo_reader::{zwo_read, Workout};
@@ -22,10 +23,6 @@ use uuid::{uuid, Uuid};
 /*=======================================================================
  * CONSTANTS
  * ====================================================================*/
-// shots in the dark
-const CHAR_ID1: Uuid = uuid!("00002a00-0000-1000-8000-00805f9b34fb");
-const CHAR_ID2: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb");
-const CHAR_ID3: Uuid = uuid!("00002a00-0000-1000-8000-00805f9b34fb");
 
 /*=======================================================================
  * ENUMS
@@ -182,78 +179,26 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         let peripheral = app_struct.selected_peripheral.clone().unwrap();
         let _ = task::block_on(peripheral.discover_services());
         let characteristics = peripheral.characteristics();
-        let cmd_value = vec![app_struct.resistance_value];
-        let cmd_char1 = characteristics.iter().find(|c| c.uuid == CHAR_ID1);
-        let cmd_char2 = characteristics.iter().find(|c| c.uuid == CHAR_ID2);
-        let cmd_char3 = characteristics.iter().find(|c| c.uuid == CHAR_ID3);
-
-        ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut app_struct.resistance_text);
-            if ui.button("Try 1").clicked() {
-                if cmd_char1.is_some() {
-                    let write_result1 = task::block_on(peripheral.write(
-                        cmd_char1.unwrap(),
-                        &cmd_value,
-                        WriteType::WithoutResponse,
-                    ));
-                    println!("{:?}", write_result1);
-                } else {
-                    println!("CHAR_ID1 not found!");
-                }
-            }
-            if ui.button("Try 2").clicked() {
-                if cmd_char2.is_some() {
-                    let write_result2 = task::block_on(peripheral.write(
-                        cmd_char2.unwrap(),
-                        &cmd_value,
-                        WriteType::WithoutResponse,
-                    ));
-                    println!("{:?}", write_result2);
-                } else {
-                    println!("CHAR_ID2 not found!");
-                }
-            }
-            if ui.button("Try 3").clicked() {
-                if cmd_char3.is_some() {
-                    let write_result3 = task::block_on(peripheral.write(
-                        cmd_char3.unwrap(),
-                        &cmd_value,
-                        WriteType::WithoutResponse,
-                    ));
-                    println!("{:?}", write_result3);
-                } else {
-                    println!("CHAR_ID3 not found!");
-                }
-            }
-        });
-
-        for chars in characteristics.iter() {
-            let name_result = SPECIAL_CHARACTERISTICS_NAMES.get(&chars.uuid);
-            let mut name: String;
-            if name_result.is_some() {
-                name = name_result.unwrap().to_string();
-            } else {
-                name = chars.uuid.to_string();
-            }
-            let read_result = task::block_on(peripheral.read(chars));
-            let mut value: String;
+        let feature_char = characteristics
+            .iter()
+            .find(|c| c.uuid == CPS_POWER_FEATURE)
+            .unwrap();
+        if ui.button("Read Features").clicked() {
+            let read_result = task::block_on(peripheral.read(feature_char));
             match read_result {
                 Ok(buf) => {
-                    /*
-                    let s = match str::from_utf8(&buf) {
-                        Ok(v) => v.to_string(),
-                        Err(e) => e.to_string(),
-                    };
-                    value = s;
-                    */
-                    value = String::from_utf8_lossy(&buf).into_owned();
+                    println!("Feature buffer length: {:?}", buf.len());
+                    let hack_buffer = u32::from_le_bytes(buf.clone().try_into().unwrap());
+                    let hack_struct = CpsFeature(hack_buffer);
+                    println!("{:?}", hack_struct);
+                    let combined_buffer = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+                    let feature_struct = CpsFeature(combined_buffer);
+                    println!("{:?}", feature_struct);
                 }
-                Err(e) => value = e.to_string(),
+                Err(e) => {
+                    ui.label(e.to_string());
+                }
             }
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut name);
-                ui.text_edit_singleline(&mut value);
-            });
         }
     }
 }

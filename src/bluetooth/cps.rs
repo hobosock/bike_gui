@@ -20,7 +20,7 @@ pub const CPS_CONTROL_POINT: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb"
 // Cycling Power Feature [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.4)
 // Table 4.5 AND Table 4.6???
 bitfield! {
-    pub struct CpsFeature(u32): Debug {
+    pub struct CpsFeature(pub u32): Debug {
         pub pedal_power_balance_supported: bool @ 0,
         pub accumulated_torque_supported: bool @ 1,
         pub wheel_revolution_data_supported: bool @ 2,
@@ -50,7 +50,7 @@ bitfield! {
 // Mask Cycling Power Measurement Characteristic Content Procedure (4.7.2.13)
 
 bitfield! {
-    pub struct CpsFlag(u16): Debug {
+    pub struct CpsFlag(pub u16): Debug {
         pub pedal_power_balance_present: bool @ 0,
         pub pedal_power_balance_reference: bool @ 1,
         pub accumulated_torque_present: bool @ 2,
