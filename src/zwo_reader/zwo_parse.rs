@@ -1,4 +1,7 @@
-use std::fs;
+use crate::zwo_reader;
+use std::{fmt, fs};
+
+use super::zwo_command::WorkoutTimeSeries;
 
 /*===================================================================================
  * ENUMS
@@ -29,6 +32,21 @@ pub enum TextTags {
 /*===================================================================================
  * STRUCTURES
  * ================================================================================*/
+// TODO: make the error messages a bit more helpful (identify missing field)
+pub struct TimeSeriesError;
+
+impl fmt::Display for TimeSeriesError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Missing essential field.") // user facing
+    }
+}
+
+impl fmt::Debug for TimeSeriesError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Missing essential field.") // programmer facing
+    }
+}
+
 #[derive(Debug)]
 pub struct Warmup {
     pub cadence: Option<i32>,
@@ -46,6 +64,31 @@ pub struct Warmup {
     pub text: Option<String>,
     pub units: Option<i32>, // no idea what this one does
     pub zone: Option<i32>,  // heart rate zone, maybe?
+}
+
+impl Warmup {
+    fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || ( self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+        }
+        if self.power.is_some() || ( self.power_low.is_some() && self.power_high.is_some()) {
+            b_power = true;
+        }
+        if b_power && b_cadence && b_duration {
+            // minimum data required to produce time series data
+            let duration = self.duration.unwrap();
+            let cadence_vec = self.
+        } else {
+            return Err(TimeSeriesError);
+        }
+    }
 }
 
 #[derive(Debug)]
