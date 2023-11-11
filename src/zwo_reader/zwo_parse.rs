@@ -1,4 +1,7 @@
-use crate::zwo_reader;
+use crate::{
+    math::{float_linspace, int_linspace},
+    zwo_reader,
+};
 use std::{fmt, fs};
 
 use super::zwo_command::WorkoutTimeSeries;
@@ -67,7 +70,7 @@ pub struct Warmup {
 }
 
 impl Warmup {
-    fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
         // minimum required information - cadence, power target, duration
         let mut b_duration = false;
         let mut b_cadence = false;
@@ -91,14 +94,37 @@ impl Warmup {
         }
         if b_power && b_cadence && b_duration {
             let duration = self.duration.unwrap();
-            let duration_vec: Vec<usize> = (0..duration as usize).collect();
-            let cadence: Vec<i32>;
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
             if constant_cadence {
                 // create vector matching duration length, all one value
-                cadence = vec![self.cadence.unwrap(); duration_vec.len()];
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
             } else {
                 // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
             }
+            if constant_power {
+                power_vec = vec![self.power.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_low.unwrap(),
+                    self.power_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
         } else {
             return Err(TimeSeriesError);
         }
