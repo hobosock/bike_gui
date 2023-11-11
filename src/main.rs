@@ -7,6 +7,7 @@
 use app::*;
 mod app;
 mod bluetooth;
+mod math;
 mod zwo_reader;
 
 // external crates

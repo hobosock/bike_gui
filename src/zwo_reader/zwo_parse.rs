@@ -72,19 +72,33 @@ impl Warmup {
         let mut b_duration = false;
         let mut b_cadence = false;
         let mut b_power = false;
+        let mut constant_cadence = true;
+        let mut constant_power = true;
         if self.duration.is_some() {
             b_duration = true;
         }
-        if self.cadence.is_some() || ( self.cadence_low.is_some() && self.cadence_high.is_some()) {
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
             b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
         }
-        if self.power.is_some() || ( self.power_low.is_some() && self.power_high.is_some()) {
+        if self.power.is_some() || (self.power_low.is_some() && self.power_high.is_some()) {
             b_power = true;
+            if self.power_low.is_some() && self.power_high.is_some() {
+                constant_power = false;
+            }
         }
         if b_power && b_cadence && b_duration {
-            // minimum data required to produce time series data
             let duration = self.duration.unwrap();
-            let cadence_vec = self.
+            let duration_vec: Vec<usize> = (0..duration as usize).collect();
+            let cadence: Vec<i32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+            }
         } else {
             return Err(TimeSeriesError);
         }
