@@ -139,10 +139,10 @@ impl eframe::App for BikeApp {
                     self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()]
                 );
-                self.peripheral_text = update_peripheral_text(
+                self.peripheral_text = task::block_on(update_peripheral_text(
                     &self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()],
-                );
+                ));
                 self.selected_peripheral = Some(
                     self.peripheral_list
                         .as_mut()
@@ -201,8 +201,18 @@ async fn update_adapter_text(adapter: &Adapter) -> String {
 }
 
 /// update bluetooth peripheral combobox text based on selection
-fn update_peripheral_text(peripheral: &Peripheral) -> String {
-    let peripheral_str = peripheral.id().to_string();
+async fn update_peripheral_text(peripheral: &Peripheral) -> String {
+    let mut peripheral_str = peripheral.id().to_string();
+    match peripheral.properties().await {
+        Ok(properties) => match properties {
+            Some(prop) => match prop.local_name {
+                Some(name) => peripheral_str = name,
+                None => {}
+            },
+            None => {}
+        },
+        Err(_) => {}
+    }
     return peripheral_str;
 }
 
@@ -394,7 +404,6 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         if app_struct.peripheral_moved {
-            println!("Selected peripheral: {:?}", app_struct.selected_peripheral);
             let mut name_str = app_struct
                 .selected_peripheral
                 .clone()
