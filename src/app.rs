@@ -60,6 +60,10 @@ pub struct BikeApp {
     peripheral_moved: bool,
     peripheral_text: String,
     peripheral_connected: bool,
+    peripheral_channel: (
+        std::sync::mpsc::Sender<Option<Vec<Peripheral>>>,
+        std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
+    ),
     // workout file stuff
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
@@ -94,6 +98,7 @@ impl Default for BikeApp {
             peripheral_moved: false,
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
+            peripheral_channel: std::sync::mpsc::channel(),
             workout_file: None,
             workout_file_dialog: None,
             workout: None,
@@ -399,8 +404,17 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         if ui.button("Scan").clicked() {
             if app_struct.adapter_moved {
                 println!("Scanning for devices...");
-                app_struct.peripheral_list =
-                    task::block_on(bt_scan(&mut app_struct.selected_adapter.as_mut().unwrap()));
+                let peripheral_sender = app_struct.peripheral_channel.0.clone();
+                let selected_adapter = app_struct.selected_adapter.clone().unwrap();
+                thread::spawn(move || {
+                    let peripheral_list = task::block_on(bt_scan(&selected_adapter));
+                    // TODO: error handling instead of unwrap
+                    peripheral_sender.send(peripheral_list).unwrap();
+                });
+                match app_struct.peripheral_channel.1.try_recv() {
+                    Ok(message) => app_struct.peripheral_list = message,
+                    Err(_) => {}
+                }
             }
         }
         if app_struct.peripheral_moved {
