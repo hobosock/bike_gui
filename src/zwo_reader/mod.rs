@@ -6,6 +6,7 @@ use self::zwo_parse::*;
 pub mod zwo_command;
 pub mod zwo_parse;
 
+#[derive(Debug, Clone)]
 pub struct Workout {
     pub exercise: Vec<ExerciseTag>,
     pub text: Vec<TextTags>,

@@ -1,9 +1,12 @@
-use std::fs;
+use crate::math::{float_linspace, int_linspace};
+use std::{fmt, fs};
+
+use super::zwo_command::WorkoutTimeSeries;
 
 /*===================================================================================
  * ENUMS
  * ================================================================================*/
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ExerciseTag {
     Warmup(Warmup),
     SteadyState(SteadyState),
@@ -18,7 +21,7 @@ pub enum ExerciseTag {
     Unknown, // TODO: evaluate if this is necessary
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TextTags {
     TextEvent(TextEvent),
     TextEvent2(Textevent),
@@ -29,7 +32,22 @@ pub enum TextTags {
 /*===================================================================================
  * STRUCTURES
  * ================================================================================*/
-#[derive(Debug)]
+// TODO: make the error messages a bit more helpful (identify missing field)
+pub struct TimeSeriesError;
+
+impl fmt::Display for TimeSeriesError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Missing essential field.") // user facing
+    }
+}
+
+impl fmt::Debug for TimeSeriesError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Missing essential field.") // programmer facing
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Warmup {
     pub cadence: Option<i32>,
     pub cadence_high: Option<i32>,
@@ -48,7 +66,71 @@ pub struct Warmup {
     pub zone: Option<i32>,  // heart rate zone, maybe?
 }
 
-#[derive(Debug)]
+impl Warmup {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_cadence = true;
+        let mut constant_power = true;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
+        }
+        if self.power.is_some() || (self.power_low.is_some() && self.power_high.is_some()) {
+            b_power = true;
+            if self.power_low.is_some() && self.power_high.is_some() {
+                constant_power = false;
+            }
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+            if constant_power {
+                power_vec = vec![self.power.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_low.unwrap(),
+                    self.power_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("Warmup failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct SteadyState {
     pub cadence: Option<i32>,
     pub cadence_high: Option<i32>,
@@ -74,7 +156,71 @@ pub struct SteadyState {
     pub zone: Option<i32>,  // heart rate zone, maybe?
 }
 
-#[derive(Debug)]
+impl SteadyState {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_cadence = true;
+        let mut constant_power = true;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
+        }
+        if self.power.is_some() || (self.power_low.is_some() && self.power_high.is_some()) {
+            b_power = true;
+            if self.power_low.is_some() && self.power_high.is_some() {
+                constant_power = false;
+            }
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+            if constant_power {
+                power_vec = vec![self.power.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_low.unwrap(),
+                    self.power_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("Steady State failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Cooldown {
     pub cadence: Option<i32>,
     pub cadence_high: Option<i32>,
@@ -93,7 +239,71 @@ pub struct Cooldown {
     pub zone: Option<i32>,                        // heart rate zone, maybe?
 }
 
-#[derive(Debug)]
+impl Cooldown {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_cadence = true;
+        let mut constant_power = true;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
+        }
+        if self.power.is_some() || (self.power_low.is_some() && self.power_high.is_some()) {
+            b_power = true;
+            if self.power_low.is_some() && self.power_high.is_some() {
+                constant_power = false;
+            }
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+            if constant_power {
+                power_vec = vec![self.power.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_low.unwrap(),
+                    self.power_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("Cooldown failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct FreeRide {
     pub cadence: Option<i32>,
     pub cadence_high: Option<i32>,
@@ -107,14 +317,85 @@ pub struct FreeRide {
     pub show_average: Option<bool>,
 }
 
-#[derive(Debug)]
+impl FreeRide {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_cadence = true;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
+        }
+        if self.power.is_some() {
+            b_power = true;
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+            power_vec = vec![self.power.unwrap(); duration_vec.len()];
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("FreeRide failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Freeride {
     pub duration: Option<i32>,
     pub flat_road: Option<bool>,
     pub ftp_test: Option<bool>,
 }
 
-#[derive(Debug)]
+impl Freeride {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        if self.duration.is_some() {
+            let duration_vec: Vec<usize> = (0..(self.duration.unwrap() + 1) as usize).collect();
+            let cadence_vec: Vec<i32> = vec![0; duration_vec.len()];
+            let power_vec: Vec<f32> = vec![0.0; duration_vec.len()];
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+            return Ok(time_series);
+        } else {
+            println!("Freeride failed.");
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct IntervalsT {
     pub cadence: Option<i32>,
     pub cadence_high: Option<i32>,
@@ -137,12 +418,98 @@ pub struct IntervalsT {
     pub units: Option<i32>, // no idea what this one does
 }
 
-#[derive(Debug)]
+impl IntervalsT {
+    // TODO: this one needs to be handled differently
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_cadence = true;
+        let mut constant_power = true;
+        if self.on_duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() || (self.cadence_low.is_some() && self.cadence_high.is_some()) {
+            b_cadence = true;
+            if self.cadence_low.is_some() && self.cadence_high.is_some() {
+                constant_cadence = false;
+            }
+        }
+        if self.power_on_high.is_some()
+            || (self.power_on_low.is_some() && self.power_on_high.is_some())
+        {
+            b_power = true;
+            if self.power_on_low.is_some() && self.power_on_high.is_some() {
+                constant_power = false;
+            }
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.on_duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration as i32 + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            if constant_cadence {
+                // create vector matching duration length, all one value
+                cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            } else {
+                // use linear interpolation to create vector from high to low
+                cadence_vec = int_linspace(
+                    self.cadence_low.unwrap(),
+                    self.cadence_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+            if constant_power {
+                power_vec = vec![self.power_on_low.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_on_low.unwrap(),
+                    self.power_on_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("IntervalsT failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct MaxEffort {
     pub duration: Option<i32>,
 }
 
-#[derive(Debug)]
+impl MaxEffort {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        if self.duration.is_some() {
+            let duration_vec: Vec<usize> = (0..(self.duration.unwrap() + 1) as usize).collect();
+            let cadence_vec: Vec<i32> = vec![0; duration_vec.len()];
+            let power_vec: Vec<f32> = vec![0.0; duration_vec.len()];
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+            return Ok(time_series);
+        } else {
+            println!("MaxEffort failed.");
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Ramp {
     pub cadence: Option<i32>,
     pub cadence_resting: Option<i32>,
@@ -154,13 +521,82 @@ pub struct Ramp {
     pub show_average: Option<bool>,
 }
 
-#[derive(Debug)]
+impl Ramp {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        // minimum required information - cadence, power target, duration
+        let mut b_duration = false;
+        let mut b_cadence = false;
+        let mut b_power = false;
+        let mut constant_power = true;
+        if self.duration.is_some() {
+            b_duration = true;
+        }
+        if self.cadence.is_some() {
+            b_cadence = true;
+        }
+        if self.power.is_some() || (self.power_low.is_some() && self.power_high.is_some()) {
+            b_power = true;
+            if self.power_low.is_some() && self.power_high.is_some() {
+                constant_power = false;
+            }
+        }
+        if b_power && b_cadence && b_duration {
+            let duration = self.duration.unwrap();
+            let duration_vec: Vec<usize> = (0..(duration + 1) as usize).collect();
+            let cadence_vec: Vec<i32>;
+            let power_vec: Vec<f32>;
+            cadence_vec = vec![self.cadence.unwrap(); duration_vec.len()];
+            if constant_power {
+                power_vec = vec![self.power.unwrap(); duration_vec.len()];
+            } else {
+                power_vec = float_linspace(
+                    self.power_low.unwrap(),
+                    self.power_high.unwrap(),
+                    duration_vec.len(),
+                );
+            }
+
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+
+            return Ok(time_series);
+        } else {
+            println!("Ramp failed.");
+            println!("{:?}, {:?}, {:?}", b_duration, b_cadence, b_power);
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct SolidState {
     pub duration: Option<i32>,
     pub power: Option<f32>,
 }
 
-#[derive(Debug)]
+impl SolidState {
+    pub fn to_time_series(&self) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+        if self.duration.is_some() && self.power.is_some() {
+            let duration_vec: Vec<usize> = (0..(self.duration.unwrap() + 1) as usize).collect();
+            let cadence_vec: Vec<i32> = vec![0; duration_vec.len()];
+            let power_vec: Vec<f32> = vec![self.power.unwrap(); duration_vec.len()];
+            let time_series = WorkoutTimeSeries {
+                time: duration_vec,
+                cadence: cadence_vec,
+                power: power_vec,
+            };
+            return Ok(time_series);
+        } else {
+            println!("SolidState failed.");
+            return Err(TimeSeriesError);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct TextEvent {
     pub duration: Option<i32>,
     pub message: Option<String>,
@@ -171,7 +607,7 @@ pub struct TextEvent {
 }
 
 // yeah, there are two different text events, and it's not just spelling, they have different fields for some reason
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Textevent {
     pub distoffset: Option<i32>, // distance offset
     pub duration: Option<i32>,
@@ -182,7 +618,7 @@ pub struct Textevent {
     pub previous_element: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TextNotification {
     pub duration: Option<i32>,
     pub text: Option<String>,
