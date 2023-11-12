@@ -111,7 +111,8 @@ impl Default for BikeApp {
 
 impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // update state
+        ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
+
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
                 self.adapter_text = task::block_on(update_adapter_text(
@@ -305,7 +306,6 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
     // GUI for running workout
     if app_struct.workout_running {
         // receive message from workout thread
-        println!("Waiting for message...");
         match app_struct.workout_channel.1.try_recv() {
             Ok(message) => {
                 app_struct.display_time = message.time;
