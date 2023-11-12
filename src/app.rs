@@ -2,15 +2,13 @@
  * IMPORTS
  * ====================================================================*/
 // local files
-use crate::bluetooth::ble_default_services::SPECIAL_CHARACTERISTICS_NAMES;
 use crate::bluetooth::cps::*;
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
-use crate::zwo_reader::zwo_parse::file_to_text;
+use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
 
 // external crates
 use async_std::task;
-use btleplug::api::{Characteristic, WriteType};
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Peripheral},
@@ -18,7 +16,9 @@ use btleplug::{
 use eframe::egui::{self, Ui};
 use egui_file::FileDialog;
 use std::path::PathBuf;
-use uuid::{uuid, Uuid};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 /*=======================================================================
  * CONSTANTS
@@ -38,6 +38,13 @@ enum Tabs {
 /*=======================================================================
  * STRUCTS
  * ====================================================================*/
+#[derive(Debug)]
+pub struct WorkoutMessage {
+    time: usize,
+    target_cadence: i32,
+    target_power: f32,
+}
+
 pub struct BikeApp {
     // app state stuff
     active_tab: Tabs,
@@ -57,9 +64,16 @@ pub struct BikeApp {
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
     workout: Option<Workout>,
+    workout_time_series: Option<WorkoutTimeSeries>,
+    workout_running: bool,
     // Main/testing stuff
     resistance_text: String,
     resistance_value: u8,
+    // workout thread:
+    workout_channel: (
+        std::sync::mpsc::Sender<WorkoutMessage>,
+        std::sync::mpsc::Receiver<WorkoutMessage>,
+    ),
 }
 
 impl Default for BikeApp {
@@ -80,8 +94,11 @@ impl Default for BikeApp {
             workout_file: None,
             workout_file_dialog: None,
             workout: None,
+            workout_time_series: None,
+            workout_running: false,
             resistance_text: "0".to_string(),
             resistance_value: 0,
+            workout_channel: std::sync::mpsc::channel(),
         }
     }
 }
@@ -226,6 +243,7 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                 }
             }
         }
+
         // separate load button for now, worry about it later
         if ui.button("Load").clicked() {
             // TODO: zwo read function here
@@ -235,9 +253,81 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                     Ok(workout) => app_struct.workout = Some(workout),
                     Err(e) => println!("{:?}", e),
                 }
+                /*
+                if app_struct.workout.is_some() {
+                    println!("{:?}", app_struct.workout.clone().unwrap());
+                }
+                */
+            }
+            if app_struct.workout.is_some() {
+                let workout = app_struct.workout.clone().unwrap();
+                match create_timeseries(workout) {
+                    Ok(time_series) => app_struct.workout_time_series = Some(time_series),
+                    Err(e) => println!("Error: {:?}", e),
+                }
+            }
+        }
+
+        // demo of time series data
+        if ui.button("Start").clicked() {
+            println!("Trying to start workout...");
+            if app_struct.workout_time_series.is_some() {
+                app_struct.workout_running = true;
+                println!("Workout time series exists.");
+                let time_series = app_struct.workout_time_series.clone().unwrap();
+                let workout_sender = app_struct.workout_channel.0.clone();
+                println!("Spawning workout thread...");
+                thread::spawn(move || {
+                    for (i, _) in time_series.time.iter().enumerate() {
+                        let message = WorkoutMessage {
+                            time: time_series.time[i].clone(),
+                            target_cadence: time_series.cadence[i].clone(),
+                            target_power: time_series.power[i].clone(),
+                        };
+                        // TODO: better error handling here
+                        println!("Sending message...");
+                        workout_sender.send(message).unwrap();
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                });
+            } else {
+                println!("Load a workout first.");
             }
         }
     });
+
+    // GUI for running workout
+    if app_struct.workout_running {
+        let display_time: usize;
+        let display_cadence: i32;
+        let display_power: f32;
+        // receive message from workout thread
+        println!("Waiting for message...");
+        match app_struct.workout_channel.1.try_recv() {
+            Ok(message) => {
+                display_time = message.time;
+                display_cadence = message.target_cadence;
+                display_power = message.target_power;
+            }
+            Err(_) => {
+                display_time = 0;
+                display_cadence = 0;
+                display_power = 0.0;
+            }
+        }
+        ui.horizontal(|ui| {
+            ui.label("Time:");
+            ui.label(display_time.to_string());
+        });
+        ui.horizontal(|ui| {
+            ui.label("Cadence:");
+            ui.label(display_cadence.to_string());
+        });
+        ui.horizontal(|ui| {
+            ui.label("Power:");
+            ui.label(display_power.to_string());
+        });
+    }
 }
 
 /// draws the bluetooth tab

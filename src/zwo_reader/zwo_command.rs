@@ -7,12 +7,13 @@
  * */
 
 use super::{
-    zwo_parse::{ExerciseTag, TimeSeriesError, Warmup},
+    zwo_parse::{ExerciseTag, TimeSeriesError},
     Workout,
 };
 
 /// struct for holding workout time series data
 /// either workout section or full workout
+#[derive(Clone, Debug)]
 pub struct WorkoutTimeSeries {
     pub time: Vec<usize>,
     pub cadence: Vec<i32>,
@@ -33,7 +34,56 @@ pub fn create_timeseries(workout: Workout) -> Result<WorkoutTimeSeries, TimeSeri
                 final_cadence.append(&mut intermediate.cadence);
                 final_power.append(&mut intermediate.power);
             }
-            _ => {}
+            ExerciseTag::SteadyState(steady_state_struct) => {
+                let mut intermediate = steady_state_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::Cooldown(cooldown_struct) => {
+                let mut intermediate = cooldown_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::FreeRide(freeride_struct) => {
+                let mut intermediate = freeride_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::Freeride(freeride_struct) => {
+                let mut intermediate = freeride_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::IntervalsT(intervals_struct) => {
+                let mut intermediate = intervals_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::MaxEffort(max_struct) => {
+                let mut intermediate = max_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::Ramp(ramp_struct) => {
+                let mut intermediate = ramp_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::RestDay => {}
+            ExerciseTag::SolidState(solid_struct) => {
+                let mut intermediate = solid_struct.to_time_series()?;
+                final_duration.append(&mut intermediate.time);
+                final_cadence.append(&mut intermediate.cadence);
+                final_power.append(&mut intermediate.power);
+            }
+            ExerciseTag::Unknown => {}
         }
     }
 
