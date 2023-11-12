@@ -333,7 +333,9 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
 fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
     ui.horizontal(|ui| {
         if ui.button("Adapter").clicked() {
+            println!("Searching for adapter...");
             app_struct.bt_adapters = task::block_on(bt_adapter_scan());
+            println!("COmplete.");
         }
         if app_struct.adapter_moved {
             let adapter_info_str: String;
@@ -383,6 +385,7 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         if app_struct.peripheral_moved {
+            println!("Selected peripheral: {:?}", app_struct.selected_peripheral);
             let mut name_str = app_struct
                 .selected_peripheral
                 .clone()
