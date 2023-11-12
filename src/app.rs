@@ -130,6 +130,15 @@ impl eframe::App for BikeApp {
         }
         if self.peripheral_list.is_some() && self.selected_peripheral_number.is_some() {
             if self.peripheral_moved == false {
+                println!(
+                    "Peripheral number: {:?}",
+                    self.selected_peripheral_number.clone().unwrap()
+                );
+                println!(
+                    "Peripheral text: {:?}",
+                    self.peripheral_list.as_ref().unwrap()
+                        [self.selected_peripheral_number.clone().unwrap()]
+                );
                 self.peripheral_text = update_peripheral_text(
                     &self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()],
