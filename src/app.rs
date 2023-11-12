@@ -66,6 +66,9 @@ pub struct BikeApp {
     workout: Option<Workout>,
     workout_time_series: Option<WorkoutTimeSeries>,
     workout_running: bool,
+    display_time: usize,
+    display_cadence: i32,
+    display_power: f32,
     // Main/testing stuff
     resistance_text: String,
     resistance_value: u8,
@@ -96,6 +99,9 @@ impl Default for BikeApp {
             workout: None,
             workout_time_series: None,
             workout_running: false,
+            display_time: 0,
+            display_cadence: 0,
+            display_power: 0.0,
             resistance_text: "0".to_string(),
             resistance_value: 0,
             workout_channel: std::sync::mpsc::channel(),
@@ -298,34 +304,27 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
 
     // GUI for running workout
     if app_struct.workout_running {
-        let display_time: usize;
-        let display_cadence: i32;
-        let display_power: f32;
         // receive message from workout thread
         println!("Waiting for message...");
         match app_struct.workout_channel.1.try_recv() {
             Ok(message) => {
-                display_time = message.time;
-                display_cadence = message.target_cadence;
-                display_power = message.target_power;
+                app_struct.display_time = message.time;
+                app_struct.display_cadence = message.target_cadence;
+                app_struct.display_power = message.target_power;
             }
-            Err(_) => {
-                display_time = 0;
-                display_cadence = 0;
-                display_power = 0.0;
-            }
+            Err(_) => {}
         }
         ui.horizontal(|ui| {
             ui.label("Time:");
-            ui.label(display_time.to_string());
+            ui.label(app_struct.display_time.to_string());
         });
         ui.horizontal(|ui| {
             ui.label("Cadence:");
-            ui.label(display_cadence.to_string());
+            ui.label(app_struct.display_cadence.to_string());
         });
         ui.horizontal(|ui| {
             ui.label("Power:");
-            ui.label(display_power.to_string());
+            ui.label(app_struct.display_power.to_string());
         });
     }
 }
