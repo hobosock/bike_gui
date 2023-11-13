@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 /*=======================================================================
  * CONSTANTS
@@ -359,7 +360,7 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         if ui.button("Adapter").clicked() {
             println!("Searching for adapter...");
             app_struct.bt_adapters = task::block_on(bt_adapter_scan());
-            println!("COmplete.");
+            println!("Complete.");
         }
         if app_struct.adapter_moved {
             let adapter_info_str: String;
@@ -406,16 +407,26 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 println!("Scanning for devices...");
                 let peripheral_sender = app_struct.peripheral_channel.0.clone();
                 let selected_adapter = app_struct.selected_adapter.clone().unwrap();
+                // lmao, this doesn't seem ideal
                 thread::spawn(move || {
-                    let peripheral_list = task::block_on(bt_scan(&selected_adapter));
+                    let rt = Runtime::new().unwrap();
+                    let peripheral_list = rt.block_on(async move {
+                        let peripheral_list = task::block_on(bt_scan(&selected_adapter));
+                        return peripheral_list;
+                    });
                     // TODO: error handling instead of unwrap
                     peripheral_sender.send(peripheral_list).unwrap();
                 });
-                match app_struct.peripheral_channel.1.try_recv() {
-                    Ok(message) => app_struct.peripheral_list = message,
-                    Err(_) => {}
-                }
             }
+        }
+        // don't want receiver in the button click function, timelines get weird
+        // even here it's kind of a problem, it only receives when on the bluetooth tab
+        match app_struct.peripheral_channel.1.try_recv() {
+            Ok(message) => {
+                app_struct.peripheral_list = message;
+                println!("Complete.");
+            }
+            Err(_) => {}
         }
         if app_struct.peripheral_moved {
             let mut name_str = app_struct
