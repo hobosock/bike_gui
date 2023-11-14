@@ -16,7 +16,6 @@ use btleplug::{
 use eframe::egui::{self, Ui};
 use egui_file::FileDialog;
 use std::path::PathBuf;
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -66,6 +65,8 @@ pub struct BikeApp {
         std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
     ),
     // workout file stuff
+    user_ftp: u32,
+    user_ftp_string: String,
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
     workout: Option<Workout>,
@@ -100,6 +101,8 @@ impl Default for BikeApp {
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
             peripheral_channel: std::sync::mpsc::channel(),
+            user_ftp: 100,
+            user_ftp_string: "100".to_string(),
             workout_file: None,
             workout_file_dialog: None,
             workout: None,
@@ -118,6 +121,7 @@ impl Default for BikeApp {
 impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
+        update_text_edits(self);
 
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
@@ -193,6 +197,14 @@ impl eframe::App for BikeApp {
                 Tabs::Help => {}
             }
         });
+    }
+}
+
+/// updates stored values based on text in textedit boxes
+fn update_text_edits(app_struct: &mut BikeApp) {
+    match app_struct.user_ftp_string.parse::<u32>() {
+        Ok(ftp) => app_struct.user_ftp = ftp,
+        Err(_) => {} // dont do anything if user is typing, weird characters, etc.
     }
 }
 
@@ -329,6 +341,12 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
     });
 
     // GUI for running workout
+    // user input
+    ui.horizontal(|ui| {
+        ui.label("FTP:");
+        ui.text_edit_singleline(&mut app_struct.user_ftp_string);
+    });
+
     if app_struct.workout_running {
         // receive message from workout thread
         match app_struct.workout_channel.1.try_recv() {
@@ -349,7 +367,7 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
         });
         ui.horizontal(|ui| {
             ui.label("Power:");
-            ui.label(app_struct.display_power.to_string());
+            ui.label((app_struct.display_power * app_struct.user_ftp as f32).to_string());
         });
     }
 }
