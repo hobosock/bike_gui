@@ -45,7 +45,7 @@ bitfield! {
     }
 }
 
-// Cycling Power Measurement [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.5)
+// Cycling Power Measurement [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.5 3.2)
 // Cycling Power Control Point [https://www.bluetooth.com/specifications/specs/cycling-power-service-1-1/] (Section 4.7)
 // Mask Cycling Power Measurement Characteristic Content Procedure (4.7.2.13)
 
