@@ -290,18 +290,14 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
 
         // separate load button for now, worry about it later
         if ui.button("Load").clicked() {
-            // TODO: zwo read function here
+            println!("Loading workout...");
+            // TODO: error message if file not correct type, etc.
             if app_struct.workout_file.is_some() {
                 let filepath = app_struct.workout_file.clone().unwrap();
                 match zwo_read(filepath) {
                     Ok(workout) => app_struct.workout = Some(workout),
                     Err(e) => println!("{:?}", e),
                 }
-                /*
-                if app_struct.workout.is_some() {
-                    println!("{:?}", app_struct.workout.clone().unwrap());
-                }
-                */
             }
             if app_struct.workout.is_some() {
                 let workout = app_struct.workout.clone().unwrap();
@@ -310,17 +306,16 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                     Err(e) => println!("Error: {:?}", e),
                 }
             }
+            println!("Complete.");
         }
 
         // demo of time series data
         if ui.button("Start").clicked() {
-            println!("Trying to start workout...");
             if app_struct.workout_time_series.is_some() {
                 app_struct.workout_running = true;
-                println!("Workout time series exists.");
+                println!("Workout started!");
                 let time_series = app_struct.workout_time_series.clone().unwrap();
                 let workout_sender = app_struct.workout_channel.0.clone();
-                println!("Spawning workout thread...");
                 thread::spawn(move || {
                     for (i, _) in time_series.time.iter().enumerate() {
                         let message = WorkoutMessage {
@@ -329,7 +324,6 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                             target_power: time_series.power[i].clone(),
                         };
                         // TODO: better error handling here
-                        println!("Sending message...");
                         workout_sender.send(message).unwrap();
                         thread::sleep(Duration::from_secs(1));
                     }
@@ -338,6 +332,8 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                 println!("Load a workout first.");
             }
         }
+
+        // TODO: need a button to stop the workout
     });
 
     // GUI for running workout

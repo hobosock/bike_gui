@@ -212,5 +212,7 @@ pub fn zwo_read(filepath: PathBuf) -> Result<Workout, Box<dyn Error>> {
         text: workout_text,
     };
 
+    // TODO: do something if vectors are empty
+
     return Ok(workout_struct);
 }

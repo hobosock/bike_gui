@@ -22,6 +22,7 @@ pub struct WorkoutTimeSeries {
 
 /// takes vec<WorkoutTag> and produces time series for the full workout file
 pub fn create_timeseries(workout: Workout) -> Result<WorkoutTimeSeries, TimeSeriesError> {
+    // TODO: do something if passed an empty vector
     let mut final_duration: Vec<usize> = Vec::new();
     let mut final_cadence: Vec<i32> = Vec::new();
     let mut final_power: Vec<f32> = Vec::new();
