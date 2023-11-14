@@ -334,6 +334,8 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
         }
 
         // TODO: need a button to stop the workout
+        // probably need to create another channel, send something as long as bool is true
+        // stop sending when button is clicked, end thread execution on (try_)recv error
     });
 
     // GUI for running workout
