@@ -302,13 +302,6 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
 
 /// draws the workout tab
 fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) {
-    if app_struct.stop_workout_sender.is_some() {
-        let stop_sender = app_struct.stop_workout_sender.clone().unwrap();
-        // TODO: better error handling here
-        stop_sender
-            .send(app_struct.stop_workout_flag.clone())
-            .unwrap();
-    }
     ui.horizontal(|ui| {
         ui.label("Workout:");
         // TODO: make this a text box so you can manually enter the file path???
@@ -372,7 +365,7 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                                     break;
                                 }
                             }
-                            Err(e) => println!("Error reading stop channel: {:?}", e),
+                            Err(_) => {}
                         }
                         let message = WorkoutMessage {
                             time: time_series.time[i].clone(),
@@ -389,11 +382,16 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
             }
         }
 
-        // TODO: need a button to stop the workout
-        // probably need to create another channel, send something as long as bool is true
-        // stop sending when button is clicked, end thread execution on (try_)recv error
         if ui.button("Stop").clicked() {
             app_struct.stop_workout_flag = true;
+            // TODO: app_struct.workout running = false;
+            if app_struct.stop_workout_sender.is_some() {
+                let stop_sender = app_struct.stop_workout_sender.as_ref().unwrap();
+                // TODO: better error handling here
+                stop_sender
+                    .send(app_struct.stop_workout_flag.clone())
+                    .unwrap();
+            }
         }
     });
 
