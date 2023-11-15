@@ -257,10 +257,12 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
+        /*
         let feature_char4 = characteristics
             .iter()
             .find(|c| c.uuid == CPS_POWER_VECTOR)
             .unwrap();
+            */
         if ui.button("Read Features").clicked() {
             let read_result = task::block_on(peripheral.read(feature_char));
             let read_result2 = task::block_on(peripheral.read(feature_char2));
