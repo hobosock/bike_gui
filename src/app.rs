@@ -249,8 +249,13 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_POWER_FEATURE)
             .unwrap();
+        let feature_char2 = characteristics
+            .iter()
+            .find(|c| c.uuid == CPS_POWER_MEASUREMENT)
+            .unwrap();
         if ui.button("Read Features").clicked() {
             let read_result = task::block_on(peripheral.read(feature_char));
+            let read_result2 = task::block_on(peripheral.read(feature_char2));
             match read_result {
                 Ok(buf) => {
                     println!("Feature buffer length: {:?}", buf.len());
@@ -263,6 +268,17 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 }
                 Err(e) => {
                     ui.label(e.to_string());
+                }
+            }
+            match read_result2 {
+                Ok(buf) => {
+                    println!("Power buffer length: {:?}", buf.len());
+                    let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
+                    let power_struct = CpsFlag(combined_buffer);
+                    println!("{:?}", power_struct);
+                }
+                Err(e) => {
+                    println!("{:?}", e);
                 }
             }
         }
