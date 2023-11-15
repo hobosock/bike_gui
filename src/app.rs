@@ -257,17 +257,10 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
-        /*
-        let feature_char4 = characteristics
-            .iter()
-            .find(|c| c.uuid == CPS_POWER_VECTOR)
-            .unwrap();
-            */
         if ui.button("Read Features").clicked() {
             let read_result = task::block_on(peripheral.read(feature_char));
             let read_result2 = task::block_on(peripheral.read(feature_char2));
             let read_result3 = task::block_on(peripheral.read(feature_char3));
-            let read_result4 = task::block_on(peripheral.read(feature_char4));
             match read_result {
                 Ok(buf) => {
                     println!("Feature buffer length: {:?}", buf.len());
@@ -298,14 +291,6 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     println!("Control Point length: {:?}", buf.len());
                     let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
                     //let control_struct = Cps
-                }
-                Err(e) => {
-                    println!("{:?}", e);
-                }
-            }
-            match read_result4 {
-                Ok(buf) => {
-                    println!("Power Vector length: {:?}", buf.len());
                 }
                 Err(e) => {
                     println!("{:?}", e);
