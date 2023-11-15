@@ -83,6 +83,9 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<WorkoutMessage>,
         std::sync::mpsc::Receiver<WorkoutMessage>,
     ),
+    // stop workout channel
+    stop_workout_flag: bool,
+    stop_workout_sender: Option<std::sync::mpsc::Sender<bool>>,
 }
 
 impl Default for BikeApp {
@@ -114,6 +117,8 @@ impl Default for BikeApp {
             resistance_text: "0".to_string(),
             resistance_value: 0,
             workout_channel: std::sync::mpsc::channel(),
+            stop_workout_flag: true,
+            stop_workout_sender: None,
         }
     }
 }
@@ -266,6 +271,13 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
 
 /// draws the workout tab
 fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) {
+    if app_struct.stop_workout_sender.is_some() {
+        let stop_sender = app_struct.stop_workout_sender.clone().unwrap();
+        // TODO: better error handling here
+        stop_sender
+            .send(app_struct.stop_workout_flag.clone())
+            .unwrap();
+    }
     ui.horizontal(|ui| {
         ui.label("Workout:");
         // TODO: make this a text box so you can manually enter the file path???
@@ -311,13 +323,26 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
 
         // demo of time series data
         if ui.button("Start").clicked() {
+            app_struct.stop_workout_flag = false; // assuming this is necessary after clicking stop
             if app_struct.workout_time_series.is_some() {
                 app_struct.workout_running = true;
+                // create receiver to give to new thread
+                let (tx, stop_receiver) = std::sync::mpsc::channel();
+                app_struct.stop_workout_sender = Some(tx);
                 println!("Workout started!");
                 let time_series = app_struct.workout_time_series.clone().unwrap();
                 let workout_sender = app_struct.workout_channel.0.clone();
                 thread::spawn(move || {
                     for (i, _) in time_series.time.iter().enumerate() {
+                        // check to see if stop button has been clicked
+                        match stop_receiver.try_recv() {
+                            Ok(flag) => {
+                                if flag {
+                                    break;
+                                }
+                            }
+                            Err(e) => println!("Error reading stop channel: {:?}", e),
+                        }
                         let message = WorkoutMessage {
                             time: time_series.time[i].clone(),
                             target_cadence: time_series.cadence[i].clone(),
@@ -336,6 +361,9 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
         // TODO: need a button to stop the workout
         // probably need to create another channel, send something as long as bool is true
         // stop sending when button is clicked, end thread execution on (try_)recv error
+        if ui.button("Stop").clicked() {
+            app_struct.stop_workout_flag = true;
+        }
     });
 
     // GUI for running workout
