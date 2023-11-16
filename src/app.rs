@@ -257,10 +257,8 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
-        if ui.button("Read Features").clicked() {
+        if ui.button("Read Feature 1").clicked() {
             let read_result = task::block_on(peripheral.read(feature_char));
-            let read_result2 = task::block_on(peripheral.read(feature_char2));
-            let read_result3 = task::block_on(peripheral.read(feature_char3));
             match read_result {
                 Ok(buf) => {
                     println!("Feature buffer length: {:?}", buf.len());
@@ -275,6 +273,9 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     ui.label(e.to_string());
                 }
             }
+        }
+        if ui.button("Read Feature 2").clicked() {
+            let read_result2 = task::block_on(peripheral.read(feature_char2));
             match read_result2 {
                 Ok(buf) => {
                     println!("Power buffer length: {:?}", buf.len());
@@ -286,6 +287,9 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     println!("{:?}", e);
                 }
             }
+        }
+        if ui.button("Read Feature 3").clicked() {
+            let read_result3 = task::block_on(peripheral.read(feature_char3));
             match read_result3 {
                 Ok(buf) => {
                     println!("Control Point length: {:?}", buf.len());
