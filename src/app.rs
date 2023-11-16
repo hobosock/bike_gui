@@ -14,6 +14,7 @@ use btleplug::{
     platform::{Adapter, Peripheral},
 };
 use eframe::egui::{self, Ui};
+use eframe::epaint::Vec2;
 use egui_file::FileDialog;
 use std::path::PathBuf;
 use std::thread;
@@ -259,6 +260,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .unwrap();
         if ui.button("Read Feature 1").clicked() {
             let read_result = task::block_on(peripheral.read(feature_char));
+            // subscribe and notify instead?
             match read_result {
                 Ok(buf) => {
                     println!("Feature buffer length: {:?}", buf.len());
@@ -293,7 +295,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             match read_result3 {
                 Ok(buf) => {
                     println!("Control Point length: {:?}", buf.len());
-                    let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
+                    //let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
                     //let control_struct = Cps
                 }
                 Err(e) => {
@@ -315,7 +317,8 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
             ui.label("None");
         }
         if ui.button("Open").clicked() {
-            let mut dialog = FileDialog::open_file(app_struct.workout_file.clone());
+            let mut dialog = FileDialog::open_file(app_struct.workout_file.clone())
+                .default_size(Vec2::new(500.0, 200.0));
             dialog.open();
             app_struct.workout_file_dialog = Some(dialog);
         }

@@ -9,7 +9,7 @@ use uuid::{uuid, Uuid};
  * CONSTANTS
  * ====================================================================*/
 pub const CPS_POWER_MEASUREMENT: Uuid = uuid!("00002a63-0000-1000-8000-00805f9b34fb");
-pub const CPS_POWER_VECTOR: Uuid = uuid!("00002a64-0000-1000-8000-00805f9b34fb");
+//pub const CPS_POWER_VECTOR: Uuid = uuid!("00002a64-0000-1000-8000-00805f9b34fb");
 pub const CPS_POWER_FEATURE: Uuid = uuid!("00002a65-0000-1000-8000-00805f9b34fb");
 pub const CPS_CONTROL_POINT: Uuid = uuid!("00002a66-0000-1000-8000-00805f9b34fb");
 
