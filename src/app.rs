@@ -65,6 +65,7 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<Option<Vec<Peripheral>>>,
         std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
     ),
+    power_measurement_subscribed: bool,
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -105,6 +106,7 @@ impl Default for BikeApp {
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
             peripheral_channel: std::sync::mpsc::channel(),
+            power_measurement_subscribed: false,
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -258,7 +260,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
-        if ui.button("Read Feature 1").clicked() {
+        if ui.button("Read CPS Power Featre").clicked() {
             // probably don't need to read this one to get working for a single bike
             let read_result = task::block_on(peripheral.read(feature_char));
             // subscribe and notify instead?
@@ -277,8 +279,8 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 }
             }
         }
-        if ui.button("Read Feature 2").clicked() {
-            // don't ready - use subscribe and notify!
+        if ui.button("Subscribe to CPS Power Measurement").clicked() {
+            // don't read - use subscribe and notify!
             let read_result2 = task::block_on(peripheral.read(feature_char2));
             match read_result2 {
                 Ok(buf) => {
@@ -296,6 +298,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             match subscribe_result {
                 Ok(k) => {
                     println!("Subscribed to Power Measurement. {:?}", k);
+                    app_struct.power_measurement_subscribed = true;
                 }
                 Err(e) => {
                     println!("Failed to subscribe to Power Measurement: {:?}", e);
@@ -317,6 +320,10 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     println!("{:?}", e);
                 }
             }
+        }
+        if app_struct.power_measurement_subscribed {
+            // start a thread to monitor notifications maybe?
+            let test = peripheral.notifications();
         }
     }
 }
