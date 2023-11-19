@@ -259,6 +259,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
         if ui.button("Read Feature 1").clicked() {
+            // probably don't need to read this one to get working for a single bike
             let read_result = task::block_on(peripheral.read(feature_char));
             // subscribe and notify instead?
             match read_result {
@@ -277,6 +278,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         if ui.button("Read Feature 2").clicked() {
+            // don't ready - use subscribe and notify!
             let read_result2 = task::block_on(peripheral.read(feature_char2));
             match read_result2 {
                 Ok(buf) => {
@@ -289,8 +291,21 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     println!("{:?}", e);
                 }
             }
+
+            let subscribe_result = task::block_on(peripheral.subscribe(feature_char2));
+            match subscribe_result {
+                Ok(k) => {
+                    println!("Subscribed to Power Measurement. {:?}", k);
+                }
+                Err(e) => {
+                    println!("Failed to subscribe to Power Measurement: {:?}", e);
+                }
+            }
         }
         if ui.button("Read Feature 3").clicked() {
+            // IDK, don't bother with this one yet I guess
+            // it's writable and supports indicate (probably for write result?)
+            // don't think this one is necessary either
             let read_result3 = task::block_on(peripheral.read(feature_char3));
             match read_result3 {
                 Ok(buf) => {
