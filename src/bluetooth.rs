@@ -9,6 +9,7 @@ use tokio::time::{self};
 pub mod ble_default_services;
 pub mod cps;
 pub mod cscs;
+pub mod queue;
 
 /*=======================================================================
  * CONSTANTS
