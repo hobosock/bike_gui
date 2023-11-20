@@ -8,6 +8,7 @@ use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
 
 // external crates
+use async_std::stream::StreamExt;
 use async_std::task;
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
@@ -65,6 +66,10 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<Option<Vec<Peripheral>>>,
         std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
     ),
+    bt_queue_channel: (
+        std::sync::mpsc::Sender<Vec<u8>>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+    ),
     power_measurement_subscribed: bool,
     // workout file stuff
     user_ftp: u32,
@@ -106,6 +111,7 @@ impl Default for BikeApp {
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
             peripheral_channel: std::sync::mpsc::channel(),
+            bt_queue_channel: std::sync::mpsc::channel(),
             power_measurement_subscribed: false,
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
@@ -260,7 +266,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_CONTROL_POINT)
             .unwrap();
-        if ui.button("Read CPS Power Featre").clicked() {
+        if ui.button("Read CPS Power Feature").clicked() {
             // probably don't need to read this one to get working for a single bike
             let read_result = task::block_on(peripheral.read(feature_char));
             // subscribe and notify instead?
@@ -299,6 +305,25 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 Ok(k) => {
                     println!("Subscribed to Power Measurement. {:?}", k);
                     app_struct.power_measurement_subscribed = true;
+                    // spawn a thread to receive notifications
+                    let notification_sender = app_struct.bt_queue_channel.0.clone();
+                    let subscribed_peripheral = peripheral.clone();
+                    thread::spawn(move || {
+                        task::block_on(async move {
+                            let notification_result = subscribed_peripheral.notifications().await;
+                            match notification_result {
+                                Ok(notif) => {
+                                    let mut reading = notif.take(1);
+                                    while let Some(data) = reading.next().await {
+                                        println!("Reading: {:?}", data.value);
+                                        // TODO: better error handling here
+                                        notification_sender.send(data.value).unwrap();
+                                    }
+                                }
+                                Err(_) => {} // noting here yet
+                            }
+                        });
+                    });
                 }
                 Err(e) => {
                     println!("Failed to subscribe to Power Measurement: {:?}", e);
@@ -322,8 +347,15 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         if app_struct.power_measurement_subscribed {
-            // start a thread to monitor notifications maybe?
-            let test = peripheral.notifications();
+            // receive notifications sent and display here
+            match app_struct.bt_queue_channel.1.try_recv() {
+                Ok(message) => {
+                    for msg in message.iter() {
+                        ui.label(msg.to_string());
+                    }
+                }
+                Err(_) => {}
+            }
         }
     }
 }
