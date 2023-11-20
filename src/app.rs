@@ -8,17 +8,19 @@ use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
 
 // external crates
+use async_std::stream::StreamExt;
 use async_std::task;
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Peripheral},
 };
 use eframe::egui::{self, Ui};
+use eframe::epaint::Vec2;
 use egui_file::FileDialog;
 use std::path::PathBuf;
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 /*=======================================================================
  * CONSTANTS
@@ -60,7 +62,18 @@ pub struct BikeApp {
     peripheral_moved: bool,
     peripheral_text: String,
     peripheral_connected: bool,
+    peripheral_channel: (
+        std::sync::mpsc::Sender<Option<Vec<Peripheral>>>,
+        std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
+    ),
+    bt_queue_channel: (
+        std::sync::mpsc::Sender<Vec<u8>>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+    ),
+    power_measurement_subscribed: bool,
     // workout file stuff
+    user_ftp: u32,
+    user_ftp_string: String,
     workout_file: Option<PathBuf>,
     workout_file_dialog: Option<FileDialog>,
     workout: Option<Workout>,
@@ -77,6 +90,9 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<WorkoutMessage>,
         std::sync::mpsc::Receiver<WorkoutMessage>,
     ),
+    // stop workout channel
+    stop_workout_flag: bool,
+    stop_workout_sender: Option<std::sync::mpsc::Sender<bool>>,
 }
 
 impl Default for BikeApp {
@@ -94,6 +110,11 @@ impl Default for BikeApp {
             peripheral_moved: false,
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
+            peripheral_channel: std::sync::mpsc::channel(),
+            bt_queue_channel: std::sync::mpsc::channel(),
+            power_measurement_subscribed: false,
+            user_ftp: 100,
+            user_ftp_string: "100".to_string(),
             workout_file: None,
             workout_file_dialog: None,
             workout: None,
@@ -105,16 +126,22 @@ impl Default for BikeApp {
             resistance_text: "0".to_string(),
             resistance_value: 0,
             workout_channel: std::sync::mpsc::channel(),
+            stop_workout_flag: true,
+            stop_workout_sender: None,
         }
     }
 }
 
 impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        println!("Start of GUI loop.");
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
+        update_text_edits(self);
+        println!("Update text");
 
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
+                println!("Updating adapter text...");
                 self.adapter_text = task::block_on(update_adapter_text(
                     &self.bt_adapters.as_ref().unwrap()
                         [self.selected_adapter_number.clone().unwrap()],
@@ -139,6 +166,7 @@ impl eframe::App for BikeApp {
                     self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()]
                 );
+                println!("Updating peripheral text...");
                 self.peripheral_text = task::block_on(update_peripheral_text(
                     &self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()],
@@ -153,6 +181,7 @@ impl eframe::App for BikeApp {
             }
         }
         if self.peripheral_moved && self.selected_peripheral.is_some() {
+            println!("Updating peripheral connected flag...");
             match task::block_on(self.selected_peripheral.clone().unwrap().is_connected()) {
                 Ok(flag) => self.peripheral_connected = flag,
                 Err(_) => {}
@@ -166,6 +195,7 @@ impl eframe::App for BikeApp {
         }
 
         // main window
+        println!("Drawing main tab...");
         egui::TopBottomPanel::top("Tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.active_tab, Tabs::Main, "Main");
@@ -187,6 +217,14 @@ impl eframe::App for BikeApp {
                 Tabs::Help => {}
             }
         });
+    }
+}
+
+/// updates stored values based on text in textedit boxes
+fn update_text_edits(app_struct: &mut BikeApp) {
+    match app_struct.user_ftp_string.parse::<u32>() {
+        Ok(ftp) => app_struct.user_ftp = ftp,
+        Err(_) => {} // dont do anything if user is typing, weird characters, etc.
     }
 }
 
@@ -226,8 +264,18 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             .iter()
             .find(|c| c.uuid == CPS_POWER_FEATURE)
             .unwrap();
-        if ui.button("Read Features").clicked() {
+        let feature_char2 = characteristics
+            .iter()
+            .find(|c| c.uuid == CPS_POWER_MEASUREMENT)
+            .unwrap();
+        let feature_char3 = characteristics
+            .iter()
+            .find(|c| c.uuid == CPS_CONTROL_POINT)
+            .unwrap();
+        if ui.button("Read CPS Power Feature").clicked() {
+            // probably don't need to read this one to get working for a single bike
             let read_result = task::block_on(peripheral.read(feature_char));
+            // subscribe and notify instead?
             match read_result {
                 Ok(buf) => {
                     println!("Feature buffer length: {:?}", buf.len());
@@ -241,6 +289,67 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 Err(e) => {
                     ui.label(e.to_string());
                 }
+            }
+        }
+        if ui.button("Subscribe to CPS Power Measurement").clicked() {
+            let subscribe_result = task::block_on(peripheral.subscribe(feature_char2));
+            match subscribe_result {
+                Ok(k) => {
+                    println!("Subscribed to Power Measurement. {:?}", k);
+                    app_struct.power_measurement_subscribed = true;
+                    // spawn a thread to receive notifications
+                    let notification_sender = app_struct.bt_queue_channel.0.clone();
+                    let subscribed_peripheral = peripheral.clone();
+                    thread::spawn(move || {
+                        task::block_on(async move {
+                            let notification_result = subscribed_peripheral.notifications().await;
+                            match notification_result {
+                                Ok(notif) => {
+                                    let mut reading = notif.take(1);
+                                    while let Some(data) = reading.next().await {
+                                        println!("Reading: {:?}", data.value);
+                                        // TODO: better error handling here
+                                        notification_sender.send(data.value).unwrap();
+                                        println!("Reading sent.");
+                                    }
+                                }
+                                Err(_) => {} // noting here yet
+                            }
+                        });
+                    });
+                }
+                Err(e) => {
+                    println!("Failed to subscribe to Power Measurement: {:?}", e);
+                }
+            }
+        }
+        if ui.button("Read Feature 3").clicked() {
+            // IDK, don't bother with this one yet I guess
+            // it's writable and supports indicate (probably for write result?)
+            // don't think this one is necessary either
+            let read_result3 = task::block_on(peripheral.read(feature_char3));
+            match read_result3 {
+                Ok(buf) => {
+                    println!("Control Point length: {:?}", buf.len());
+                    //let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
+                    //let control_struct = Cps
+                }
+                Err(e) => {
+                    println!("{:?}", e);
+                }
+            }
+        }
+        if app_struct.power_measurement_subscribed {
+            // receive notifications sent and display here
+            match app_struct.bt_queue_channel.1.try_recv() {
+                Ok(message) => {
+                    println!("Message received!");
+                    for msg in message.iter() {
+                        // TODO: but label values in app struct or something
+                        ui.label(msg.to_string());
+                    }
+                }
+                Err(_) => {}
             }
         }
     }
@@ -257,7 +366,8 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
             ui.label("None");
         }
         if ui.button("Open").clicked() {
-            let mut dialog = FileDialog::open_file(app_struct.workout_file.clone());
+            let mut dialog = FileDialog::open_file(app_struct.workout_file.clone())
+                .default_size(Vec2::new(500.0, 200.0));
             dialog.open();
             app_struct.workout_file_dialog = Some(dialog);
         }
@@ -272,18 +382,14 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
 
         // separate load button for now, worry about it later
         if ui.button("Load").clicked() {
-            // TODO: zwo read function here
+            println!("Loading workout...");
+            // TODO: error message if file not correct type, etc.
             if app_struct.workout_file.is_some() {
                 let filepath = app_struct.workout_file.clone().unwrap();
                 match zwo_read(filepath) {
                     Ok(workout) => app_struct.workout = Some(workout),
                     Err(e) => println!("{:?}", e),
                 }
-                /*
-                if app_struct.workout.is_some() {
-                    println!("{:?}", app_struct.workout.clone().unwrap());
-                }
-                */
             }
             if app_struct.workout.is_some() {
                 let workout = app_struct.workout.clone().unwrap();
@@ -292,26 +398,37 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                     Err(e) => println!("Error: {:?}", e),
                 }
             }
+            println!("Complete.");
         }
 
         // demo of time series data
         if ui.button("Start").clicked() {
-            println!("Trying to start workout...");
+            app_struct.stop_workout_flag = false; // assuming this is necessary after clicking stop
             if app_struct.workout_time_series.is_some() {
                 app_struct.workout_running = true;
-                println!("Workout time series exists.");
+                // create receiver to give to new thread
+                let (tx, stop_receiver) = std::sync::mpsc::channel();
+                app_struct.stop_workout_sender = Some(tx);
+                println!("Workout started!");
                 let time_series = app_struct.workout_time_series.clone().unwrap();
                 let workout_sender = app_struct.workout_channel.0.clone();
-                println!("Spawning workout thread...");
                 thread::spawn(move || {
                     for (i, _) in time_series.time.iter().enumerate() {
+                        // check to see if stop button has been clicked
+                        match stop_receiver.try_recv() {
+                            Ok(flag) => {
+                                if flag {
+                                    break;
+                                }
+                            }
+                            Err(_) => {}
+                        }
                         let message = WorkoutMessage {
                             time: time_series.time[i].clone(),
                             target_cadence: time_series.cadence[i].clone(),
                             target_power: time_series.power[i].clone(),
                         };
                         // TODO: better error handling here
-                        println!("Sending message...");
                         workout_sender.send(message).unwrap();
                         thread::sleep(Duration::from_secs(1));
                     }
@@ -320,9 +437,27 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
                 println!("Load a workout first.");
             }
         }
+
+        if ui.button("Stop").clicked() {
+            app_struct.stop_workout_flag = true;
+            // TODO: app_struct.workout running = false;
+            if app_struct.stop_workout_sender.is_some() {
+                let stop_sender = app_struct.stop_workout_sender.as_ref().unwrap();
+                // TODO: better error handling here
+                stop_sender
+                    .send(app_struct.stop_workout_flag.clone())
+                    .unwrap();
+            }
+        }
     });
 
     // GUI for running workout
+    // user input
+    ui.horizontal(|ui| {
+        ui.label("FTP:");
+        ui.text_edit_singleline(&mut app_struct.user_ftp_string);
+    });
+
     if app_struct.workout_running {
         // receive message from workout thread
         match app_struct.workout_channel.1.try_recv() {
@@ -343,7 +478,7 @@ fn draw_workout_tab(ctx: &egui::Context, ui: &mut Ui, app_struct: &mut BikeApp) 
         });
         ui.horizontal(|ui| {
             ui.label("Power:");
-            ui.label(app_struct.display_power.to_string());
+            ui.label((app_struct.display_power * app_struct.user_ftp as f32).to_string());
         });
     }
 }
@@ -354,7 +489,7 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         if ui.button("Adapter").clicked() {
             println!("Searching for adapter...");
             app_struct.bt_adapters = task::block_on(bt_adapter_scan());
-            println!("COmplete.");
+            println!("Complete.");
         }
         if app_struct.adapter_moved {
             let adapter_info_str: String;
@@ -399,9 +534,28 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         if ui.button("Scan").clicked() {
             if app_struct.adapter_moved {
                 println!("Scanning for devices...");
-                app_struct.peripheral_list =
-                    task::block_on(bt_scan(&mut app_struct.selected_adapter.as_mut().unwrap()));
+                let peripheral_sender = app_struct.peripheral_channel.0.clone();
+                let selected_adapter = app_struct.selected_adapter.clone().unwrap();
+                // lmao, this doesn't seem ideal
+                thread::spawn(move || {
+                    let rt = Runtime::new().unwrap();
+                    let peripheral_list = rt.block_on(async move {
+                        let peripheral_list = task::block_on(bt_scan(&selected_adapter));
+                        return peripheral_list;
+                    });
+                    // TODO: error handling instead of unwrap
+                    peripheral_sender.send(peripheral_list).unwrap();
+                });
             }
+        }
+        // don't want receiver in the button click function, timelines get weird
+        // even here it's kind of a problem, it only receives when on the bluetooth tab
+        match app_struct.peripheral_channel.1.try_recv() {
+            Ok(message) => {
+                app_struct.peripheral_list = message;
+                println!("Complete.");
+            }
+            Err(_) => {}
         }
         if app_struct.peripheral_moved {
             let mut name_str = app_struct

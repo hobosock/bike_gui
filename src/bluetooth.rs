@@ -1,7 +1,7 @@
 /*=======================================================================
  * IMPORTS
  * ====================================================================*/
-use btleplug::api::{Central, Manager as Manager_api, Peripheral as Peripheral_api, ScanFilter};
+use btleplug::api::{Central, Manager as Manager_api, ScanFilter};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use std::time::Duration;
 use tokio::time::{self};
