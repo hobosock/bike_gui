@@ -286,20 +286,6 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         if ui.button("Subscribe to CPS Power Measurement").clicked() {
-            // don't read - use subscribe and notify!
-            let read_result2 = task::block_on(peripheral.read(feature_char2));
-            match read_result2 {
-                Ok(buf) => {
-                    println!("Power buffer length: {:?}", buf.len());
-                    let combined_buffer = u16::from_le_bytes(buf.clone().try_into().unwrap());
-                    let power_struct = CpsFlag(combined_buffer);
-                    println!("{:?}", power_struct);
-                }
-                Err(e) => {
-                    println!("{:?}", e);
-                }
-            }
-
             let subscribe_result = task::block_on(peripheral.subscribe(feature_char2));
             match subscribe_result {
                 Ok(k) => {
