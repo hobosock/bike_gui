@@ -304,6 +304,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                                         println!("Reading: {:?}", data.value);
                                         // TODO: better error handling here
                                         notification_sender.send(data.value).unwrap();
+                                        println!("Reading sent.");
                                     }
                                 }
                                 Err(_) => {} // noting here yet
@@ -336,7 +337,9 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             // receive notifications sent and display here
             match app_struct.bt_queue_channel.1.try_recv() {
                 Ok(message) => {
+                    println!("Message received!");
                     for msg in message.iter() {
+                        println!("Drawing label...");
                         ui.label(msg.to_string());
                     }
                 }
