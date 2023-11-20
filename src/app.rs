@@ -339,14 +339,16 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 Ok(message) => {
                     println!("Message received!");
                     for msg in message.iter() {
-                        println!("Drawing label...");
+                        // TODO: but label values in app struct or something
                         ui.label(msg.to_string());
                     }
                 }
                 Err(_) => {}
             }
         }
+        println!("End of render loop.");
     }
+    println!("End of render loop if peripheral isn't connected.");
 }
 
 /// draws the workout tab
