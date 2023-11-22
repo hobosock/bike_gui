@@ -134,14 +134,11 @@ impl Default for BikeApp {
 
 impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        println!("Start of GUI loop.");
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
         update_text_edits(self);
-        println!("Update text");
 
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
-                println!("Updating adapter text...");
                 self.adapter_text = task::block_on(update_adapter_text(
                     &self.bt_adapters.as_ref().unwrap()
                         [self.selected_adapter_number.clone().unwrap()],
@@ -166,7 +163,6 @@ impl eframe::App for BikeApp {
                     self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()]
                 );
-                println!("Updating peripheral text...");
                 self.peripheral_text = task::block_on(update_peripheral_text(
                     &self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()],
@@ -181,7 +177,6 @@ impl eframe::App for BikeApp {
             }
         }
         if self.peripheral_moved && self.selected_peripheral.is_some() {
-            println!("Updating peripheral connected flag...");
             match task::block_on(self.selected_peripheral.clone().unwrap().is_connected()) {
                 Ok(flag) => self.peripheral_connected = flag,
                 Err(_) => {}
@@ -195,7 +190,6 @@ impl eframe::App for BikeApp {
         }
 
         // main window
-        println!("Drawing main tab...");
         egui::TopBottomPanel::top("Tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.active_tab, Tabs::Main, "Main");

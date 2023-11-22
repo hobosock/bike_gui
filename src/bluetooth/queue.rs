@@ -37,6 +37,7 @@ pub struct QueueItem<'a> {
 pub struct QueueChannels {
     pub is_connected: Sender<bool>,
     pub peripherals: Sender<Option<Vec<Peripheral>>>, // TODO: remove option???
+    pub subscribed: Sender<bool>,
     pub cps_power_reading: Sender<Vec<u8>>,
     pub cps_features: Sender<CpsFeature>,
 }
@@ -89,6 +90,7 @@ async fn process_queue_item(
         BtAction::Subscribe => {
             let subscribe_result = peripheral.subscribe(action.characteristic).await?;
             println!("Subscribed to characteristic: {:?}", action.characteristic);
+            channels.subscribed.send(true)?;
             return Ok(subscribe_result);
         }
         BtAction::Notifications => {
@@ -97,6 +99,7 @@ async fn process_queue_item(
             while let Some(data) = reading.next().await {
                 println!("Reading: {:?}", data.value);
                 // send reading
+                channels.cps_power_reading.send(data.value)?;
             }
             return Ok(());
         }
@@ -104,12 +107,14 @@ async fn process_queue_item(
             println!("Connecting to {:?}...", peripheral);
             peripheral.connect().await?;
             println!("Connected.");
+            channels.is_connected.send(true)?;
             return Ok(());
         }
         BtAction::Disconnect => {
             println!("Disconnecting from {:?}...", peripheral);
             peripheral.disconnect().await?;
             println!("Disconnected.");
+            channels.is_connected.send(false)?;
             return Ok(());
         }
     }
