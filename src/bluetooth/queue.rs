@@ -7,7 +7,6 @@ use async_std::stream::StreamExt;
 use btleplug::{
     api::{Characteristic, Peripheral as Peripheral_api},
     platform::Peripheral,
-    Error as BtleError,
 };
 use std::error::Error;
 

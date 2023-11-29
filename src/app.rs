@@ -3,6 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::cps::*;
+use crate::bluetooth::queue::QueueItem;
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
@@ -47,7 +48,7 @@ pub struct WorkoutMessage {
     target_power: f32,
 }
 
-pub struct BikeApp {
+pub struct BikeApp<'a> {
     // app state stuff
     active_tab: Tabs,
     // bluetooth stuff
@@ -66,11 +67,16 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<Option<Vec<Peripheral>>>,
         std::sync::mpsc::Receiver<Option<Vec<Peripheral>>>,
     ),
-    bt_queue_channel: (
+    bt_data_channel: (
         std::sync::mpsc::Sender<Vec<u8>>,
         std::sync::mpsc::Receiver<Vec<u8>>,
     ),
     power_measurement_subscribed: bool,
+    bt_queue_started: bool,
+    bt_queue_channel: (
+        std::sync::mpsc::Sender<QueueItem<'a>>,
+        std::sync::mpsc::Receiver<QueueItem<'a>>,
+    ),
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -95,7 +101,7 @@ pub struct BikeApp {
     stop_workout_sender: Option<std::sync::mpsc::Sender<bool>>,
 }
 
-impl Default for BikeApp {
+impl Default for BikeApp<'_> {
     fn default() -> Self {
         Self {
             active_tab: Tabs::Main,
@@ -111,8 +117,10 @@ impl Default for BikeApp {
             peripheral_text: "None selected".to_string(),
             peripheral_connected: false,
             peripheral_channel: std::sync::mpsc::channel(),
-            bt_queue_channel: std::sync::mpsc::channel(),
+            bt_data_channel: std::sync::mpsc::channel(),
             power_measurement_subscribed: false,
+            bt_queue_started: false,
+            bt_queue_channel: std::sync::mpsc::channel(),
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -132,7 +140,7 @@ impl Default for BikeApp {
     }
 }
 
-impl eframe::App for BikeApp {
+impl eframe::App for BikeApp<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
         update_text_edits(self);
@@ -292,7 +300,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     println!("Subscribed to Power Measurement. {:?}", k);
                     app_struct.power_measurement_subscribed = true;
                     // spawn a thread to receive notifications
-                    let notification_sender = app_struct.bt_queue_channel.0.clone();
+                    let notification_sender = app_struct.bt_data_channel.0.clone();
                     let subscribed_peripheral = peripheral.clone();
                     thread::spawn(move || {
                         task::block_on(async move {
@@ -335,7 +343,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         }
         if app_struct.power_measurement_subscribed {
             // receive notifications sent and display here
-            match app_struct.bt_queue_channel.1.try_recv() {
+            match app_struct.bt_data_channel.1.try_recv() {
                 Ok(message) => {
                     println!("Message received!");
                     for msg in message.iter() {
