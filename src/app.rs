@@ -3,7 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::cps::*;
-use crate::bluetooth::queue::QueueItem;
+use crate::bluetooth::queue::{bt_q_main, QueueItem};
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
@@ -72,11 +72,7 @@ pub struct BikeApp<'a> {
         std::sync::mpsc::Receiver<Vec<u8>>,
     ),
     power_measurement_subscribed: bool,
-    bt_queue_started: bool,
-    bt_queue_channel: (
-        std::sync::mpsc::Sender<QueueItem<'a>>,
-        std::sync::mpsc::Receiver<QueueItem<'a>>,
-    ),
+    bt_queue_sender: Option<std::sync::mpsc::Sender<QueueItem<'a>>>,
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -119,8 +115,7 @@ impl Default for BikeApp<'_> {
             peripheral_channel: std::sync::mpsc::channel(),
             bt_data_channel: std::sync::mpsc::channel(),
             power_measurement_subscribed: false,
-            bt_queue_started: false,
-            bt_queue_channel: std::sync::mpsc::channel(),
+            bt_queue_sender: None,
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -147,6 +142,7 @@ impl eframe::App for BikeApp<'_> {
 
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
+                // move adapter, make it active adapter
                 self.adapter_text = task::block_on(update_adapter_text(
                     &self.bt_adapters.as_ref().unwrap()
                         [self.selected_adapter_number.clone().unwrap()],
@@ -158,6 +154,15 @@ impl eframe::App for BikeApp<'_> {
                         .remove(self.selected_adapter_number.clone().unwrap()),
                 );
                 self.adapter_moved = true;
+
+                // start bluetooth queue
+                if self.bt_queue_sender.is_none() {
+                    let (bt_queue_sender, bt_queue_recv) = std::sync::mpsc::channel();
+                    self.bt_queue_sender = Some(bt_queue_sender);
+                    thread::spawn(move || {
+                        bt_q_main(bt_queue_recv, channels, kill);
+                    });
+                }
             }
         }
         if self.peripheral_list.is_some() && self.selected_peripheral_number.is_some() {
