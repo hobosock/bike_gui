@@ -3,7 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::cps::*;
-use crate::bluetooth::queue::{bt_q_main, QueueItem};
+use crate::bluetooth::queue::{bt_q_main, QueueChannels, QueueItem};
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
@@ -73,6 +73,27 @@ pub struct BikeApp<'a> {
     ),
     power_measurement_subscribed: bool,
     bt_queue_sender: Option<std::sync::mpsc::Sender<QueueItem<'a>>>,
+    queue_kill_sender: Option<std::sync::mpsc::Sender<bool>>,
+    connected_channel: (
+        std::sync::mpsc::Sender<bool>,
+        std::sync::mpsc::Receiver<bool>,
+    ),
+    subscribed_channel: (
+        std::sync::mpsc::Sender<bool>,
+        std::sync::mpsc::Receiver<bool>,
+    ),
+    cps_channel: (
+        std::sync::mpsc::Sender<Vec<u8>>,
+        std::sync::mpsc::Receiver<Vec<u8>>,
+    ),
+    features_channel: (
+        std::sync::mpsc::Sender<CpsFeature>,
+        std::sync::mpsc::Receiver<CpsFeature>,
+    ),
+    results_channel: (
+        std::sync::mpsc::Sender<String>,
+        std::sync::mpsc::Receiver<String>,
+    ),
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -116,6 +137,12 @@ impl Default for BikeApp<'_> {
             bt_data_channel: std::sync::mpsc::channel(),
             power_measurement_subscribed: false,
             bt_queue_sender: None,
+            queue_kill_sender: None,
+            connected_channel: std::sync::mpsc::channel(),
+            subscribed_channel: std::sync::mpsc::channel(),
+            cps_channel: std::sync::mpsc::channel(),
+            features_channel: std::sync::mpsc::channel(),
+            results_channel: std::sync::mpsc::channel(),
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -159,8 +186,18 @@ impl eframe::App for BikeApp<'_> {
                 if self.bt_queue_sender.is_none() {
                     let (bt_queue_sender, bt_queue_recv) = std::sync::mpsc::channel();
                     self.bt_queue_sender = Some(bt_queue_sender);
+                    let (kill_tx, kill_rx) = std::sync::mpsc::channel();
+                    self.queue_kill_sender = Some(kill_tx);
+                    let channels = QueueChannels {
+                        is_connected: self.connected_channel.0.clone(),
+                        peripherals: self.peripheral_channel.0.clone(),
+                        subscribed: self.subscribed_channel.0.clone(),
+                        cps_power_reading: self.cps_channel.0.clone(),
+                        cps_features: self.features_channel.0.clone(),
+                        results: self.results_channel.0.clone(),
+                    };
                     thread::spawn(move || {
-                        bt_q_main(bt_queue_recv, channels, kill);
+                        bt_q_main(bt_queue_recv, channels, kill_rx);
                     });
                 }
             }
