@@ -29,10 +29,10 @@ pub enum BtAction {
  * STRUCTS
  * ====================================================================*/
 #[derive(Clone, Debug)]
-pub struct QueueItem<'a> {
+pub struct QueueItem {
     pub action: BtAction,
     pub peripheral: Peripheral,
-    pub characteristic: &'a Characteristic,
+    pub characteristic: Characteristic,
 }
 
 /// channels that bluetooth queue thread will use to send information back
@@ -55,7 +55,7 @@ pub struct QueueChannels {
 /// exits when queue is cleared, will need to be restarted from caller
 // TODO: this seems like a bad idea? not using it
 pub async fn process_queue(
-    queue: &mut Vec<QueueItem<'_>>,
+    queue: &mut Vec<QueueItem>,
     peripheral: &Peripheral,
     channels: QueueChannels,
 ) {
@@ -75,7 +75,7 @@ pub async fn process_queue(
 // TODO: update app_struct or something??? use channels
 /// processes individual bluetooth actions from queue
 async fn process_queue_item(
-    action: QueueItem<'_>,
+    action: QueueItem,
     peripheral: &Peripheral,
     channels: QueueChannels,
 ) -> Result<(), Box<dyn Error>> {
@@ -86,7 +86,7 @@ async fn process_queue_item(
             return Ok(());
         }
         BtAction::Read => {
-            let reading = peripheral.read(action.characteristic).await?;
+            let reading = peripheral.read(&action.characteristic).await?;
             // TODO: can program crash here?
             let buffer = u32::from_le_bytes(reading.try_into().unwrap());
             let read_struct = CpsFeature(buffer);
@@ -94,7 +94,7 @@ async fn process_queue_item(
             return Ok(());
         }
         BtAction::Subscribe => {
-            let subscribe_result = peripheral.subscribe(action.characteristic).await?;
+            let subscribe_result = peripheral.subscribe(&action.characteristic).await?;
             println!("Subscribed to characteristic: {:?}", action.characteristic);
             channels.subscribed.send(true)?;
             return Ok(subscribe_result);
@@ -127,7 +127,7 @@ async fn process_queue_item(
 }
 
 /// bluetooth queue main loop
-pub async fn bt_q_main(rx: Receiver<QueueItem<'_>>, channels: QueueChannels, kill: Receiver<bool>) {
+pub async fn bt_q_main(rx: Receiver<QueueItem>, channels: QueueChannels, kill: Receiver<bool>) {
     let mut queue: Vec<QueueItem> = Vec::new();
     let mut stop_loop = false;
     loop {

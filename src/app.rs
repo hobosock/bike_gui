@@ -48,7 +48,7 @@ pub struct WorkoutMessage {
     target_power: f32,
 }
 
-pub struct BikeApp<'a> {
+pub struct BikeApp {
     // app state stuff
     active_tab: Tabs,
     // bluetooth stuff
@@ -72,7 +72,7 @@ pub struct BikeApp<'a> {
         std::sync::mpsc::Receiver<Vec<u8>>,
     ),
     power_measurement_subscribed: bool,
-    bt_queue_sender: Option<std::sync::mpsc::Sender<QueueItem<'a>>>,
+    bt_queue_sender: Option<std::sync::mpsc::Sender<QueueItem>>,
     queue_kill_sender: Option<std::sync::mpsc::Sender<bool>>,
     connected_channel: (
         std::sync::mpsc::Sender<bool>,
@@ -118,7 +118,7 @@ pub struct BikeApp<'a> {
     stop_workout_sender: Option<std::sync::mpsc::Sender<bool>>,
 }
 
-impl Default for BikeApp<'_> {
+impl Default for BikeApp {
     fn default() -> Self {
         Self {
             active_tab: Tabs::Main,
@@ -162,7 +162,7 @@ impl Default for BikeApp<'_> {
     }
 }
 
-impl eframe::App for BikeApp<'_> {
+impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
         update_text_edits(self);
@@ -196,8 +196,8 @@ impl eframe::App for BikeApp<'_> {
                         cps_features: self.features_channel.0.clone(),
                         results: self.results_channel.0.clone(),
                     };
-                    thread::spawn(move || {
-                        bt_q_main(bt_queue_recv, channels, kill_rx);
+                    thread::spawn(move || async {
+                        bt_q_main(bt_queue_recv, channels, kill_rx).await;
                     });
                 }
             }
