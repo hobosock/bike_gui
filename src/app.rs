@@ -3,7 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::cps::*;
-use crate::bluetooth::queue::{bt_q_main, QueueChannels, QueueItem};
+use crate::bluetooth::queue::{bt_q_main, BtAction, QueueChannels, QueueItem};
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
@@ -11,6 +11,7 @@ use crate::zwo_reader::{zwo_read, Workout};
 // external crates
 use async_std::stream::StreamExt;
 use async_std::task;
+use btleplug::api::Characteristic;
 use btleplug::{
     api::{Central, Peripheral as Peripheral_api},
     platform::{Adapter, Peripheral},
@@ -18,6 +19,7 @@ use btleplug::{
 use eframe::egui::{self, Ui};
 use eframe::epaint::Vec2;
 use egui_file::FileDialog;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -94,6 +96,11 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<String>,
         std::sync::mpsc::Receiver<String>,
     ),
+    scanned: bool,
+    char_channel: (
+        std::sync::mpsc::Sender<BTreeSet<Characteristic>>,
+        std::sync::mpsc::Receiver<BTreeSet<Characteristic>>,
+    ),
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -143,6 +150,8 @@ impl Default for BikeApp {
             cps_channel: std::sync::mpsc::channel(),
             features_channel: std::sync::mpsc::channel(),
             results_channel: std::sync::mpsc::channel(),
+            scanned: false,
+            char_channel: std::sync::mpsc::channel(),
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -195,6 +204,7 @@ impl eframe::App for BikeApp {
                         cps_power_reading: self.cps_channel.0.clone(),
                         cps_features: self.features_channel.0.clone(),
                         results: self.results_channel.0.clone(),
+                        characteristics: self.char_channel.0.clone(),
                     };
                     thread::spawn(move || async {
                         bt_q_main(bt_queue_recv, channels, kill_rx).await;
@@ -213,6 +223,7 @@ impl eframe::App for BikeApp {
                     self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()]
                 );
+                // TODO: move to new thread
                 self.peripheral_text = task::block_on(update_peripheral_text(
                     &self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()],
@@ -301,6 +312,19 @@ async fn update_peripheral_text(peripheral: &Peripheral) -> String {
 /// draws the main tab
 fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
     if app_struct.peripheral_connected && app_struct.selected_peripheral.is_some() {
+        if !app_struct.scanned {
+            let peripheral = app_struct.selected_peripheral.clone().unwrap();
+            if app_struct.bt_queue_sender.is_some() {
+                let tx = app_struct.bt_queue_sender.clone().unwrap();
+                let scan_req = QueueItem {
+                    action: BtAction::Discover,
+                    peripheral: peripheral,
+                    characteristic: None,
+                };
+                let _ = tx.send(scan_req); // TODO: error handling
+            }
+        }
+        // TODO: only need to do this once, not every loop - store discovered services in app
         let peripheral = app_struct.selected_peripheral.clone().unwrap();
         let _ = task::block_on(peripheral.discover_services());
         let characteristics = peripheral.characteristics();

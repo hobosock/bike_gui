@@ -1,4 +1,7 @@
-use std::sync::mpsc::{Receiver, Sender};
+use std::{
+    collections::BTreeSet,
+    sync::mpsc::{Receiver, Sender},
+};
 
 /*=======================================================================
  * IMPORTS
@@ -23,6 +26,7 @@ pub enum BtAction {
     Notifications,
     Connect,
     Disconnect,
+    Discover,
 }
 
 /*=======================================================================
@@ -32,7 +36,7 @@ pub enum BtAction {
 pub struct QueueItem {
     pub action: BtAction,
     pub peripheral: Peripheral,
-    pub characteristic: Characteristic,
+    pub characteristic: Option<Characteristic>,
 }
 
 /// channels that bluetooth queue thread will use to send information back
@@ -45,6 +49,7 @@ pub struct QueueChannels {
     pub cps_power_reading: Sender<Vec<u8>>,
     pub cps_features: Sender<CpsFeature>,
     pub results: Sender<String>,
+    pub characteristics: Sender<BTreeSet<Characteristic>>,
 }
 
 /*=======================================================================
@@ -86,7 +91,7 @@ async fn process_queue_item(
             return Ok(());
         }
         BtAction::Read => {
-            let reading = peripheral.read(&action.characteristic).await?;
+            let reading = peripheral.read(&action.characteristic.unwrap()).await?;
             // TODO: can program crash here?
             let buffer = u32::from_le_bytes(reading.try_into().unwrap());
             let read_struct = CpsFeature(buffer);
@@ -94,8 +99,13 @@ async fn process_queue_item(
             return Ok(());
         }
         BtAction::Subscribe => {
-            let subscribe_result = peripheral.subscribe(&action.characteristic).await?;
-            println!("Subscribed to characteristic: {:?}", action.characteristic);
+            let subscribe_result = peripheral
+                .subscribe(&action.characteristic.clone().unwrap())
+                .await?;
+            println!(
+                "Subscribed to characteristic: {:?}",
+                action.characteristic.clone().unwrap()
+            );
             channels.subscribed.send(true)?;
             return Ok(subscribe_result);
         }
@@ -121,6 +131,13 @@ async fn process_queue_item(
             peripheral.disconnect().await?;
             println!("Disconnected.");
             channels.is_connected.send(false)?;
+            return Ok(());
+        }
+        BtAction::Discover => {
+            println!("Discovering services...");
+            let _ = peripheral.discover_services();
+            let characteristics = peripheral.characteristics();
+            let _ = channels.characteristics.send(characteristics); // TODO: send error handling
             return Ok(());
         }
     }
