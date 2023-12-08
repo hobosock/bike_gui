@@ -101,6 +101,10 @@ pub struct BikeApp {
         std::sync::mpsc::Sender<BTreeSet<Characteristic>>,
         std::sync::mpsc::Receiver<BTreeSet<Characteristic>>,
     ),
+    discovered_characteristics: Option<BTreeSet<Characteristic>>,
+    cps_power_feature: Option<Characteristic>,
+    cps_power_measurement: Option<Characteristic>,
+    cps_control_point: Option<Characteristic>,
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -152,6 +156,10 @@ impl Default for BikeApp {
             results_channel: std::sync::mpsc::channel(),
             scanned: false,
             char_channel: std::sync::mpsc::channel(),
+            discovered_characteristics: None,
+            cps_power_feature: None,
+            cps_power_measurement: None,
+            cps_control_point: None,
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -311,6 +319,7 @@ async fn update_peripheral_text(peripheral: &Peripheral) -> String {
 
 /// draws the main tab
 fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
+    // if a peripheral is selected (and connected), scan for services
     if app_struct.peripheral_connected && app_struct.selected_peripheral.is_some() {
         if !app_struct.scanned {
             let peripheral = app_struct.selected_peripheral.clone().unwrap();
@@ -322,7 +331,27 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     characteristic: None,
                 };
                 let _ = tx.send(scan_req); // TODO: error handling
+                app_struct.scanned = true;
             }
+        }
+        // check for characteristics (once!)
+        if app_struct.discovered_characteristics.is_none() {
+            if let Ok(char) = app_struct.char_channel.1.try_recv() {
+                app_struct.discovered_characteristics = Some(char);
+            }
+        }
+        // once characteristics are found, grab the important ones
+        if app_struct.discovered_characteristics.is_some()
+            && app_struct.cps_power_measurement.is_none()
+        {
+            let chars = app_struct.discovered_characteristics.clone().unwrap();
+            app_struct.cps_power_feature = Some(
+                *chars
+                    .iter()
+                    .find(|c| c.uuid == CPS_POWER_FEATURE)
+                    .unwrap()
+                    .clone(),
+            );
         }
         // TODO: only need to do this once, not every loop - store discovered services in app
         let peripheral = app_struct.selected_peripheral.clone().unwrap();
