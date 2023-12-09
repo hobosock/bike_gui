@@ -108,6 +108,7 @@ async fn process_queue_item(
                     println!("CPS Feature: {:?}", feature_struct);
                 }
                 CharReadType::CPSPowerReading => {
+                    // TODO: can't actually read this, delete later
                     let reading = peripheral.read(&action.characteristic.unwrap()).await?;
                     // TODO: can program crash here?
                     let buffer = u32::from_le_bytes(reading.try_into().unwrap());

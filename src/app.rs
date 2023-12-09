@@ -74,6 +74,7 @@ pub struct BikeApp {
         std::sync::mpsc::Receiver<Vec<u8>>,
     ),
     power_measurement_subscribed: bool,
+    power_subscribe_request: bool,
     bt_queue_sender: Option<std::sync::mpsc::Sender<QueueItem>>,
     queue_kill_sender: Option<std::sync::mpsc::Sender<bool>>,
     connected_channel: (
@@ -120,6 +121,8 @@ pub struct BikeApp {
     // Main/testing stuff
     resistance_text: String,
     resistance_value: u8,
+    power_reading: Vec<u8>,
+    time_since_read: u64,
     // workout thread:
     workout_channel: (
         std::sync::mpsc::Sender<WorkoutMessage>,
@@ -148,6 +151,7 @@ impl Default for BikeApp {
             peripheral_channel: std::sync::mpsc::channel(),
             bt_data_channel: std::sync::mpsc::channel(),
             power_measurement_subscribed: false,
+            power_subscribe_request: false,
             bt_queue_sender: None,
             queue_kill_sender: None,
             connected_channel: std::sync::mpsc::channel(),
@@ -174,6 +178,8 @@ impl Default for BikeApp {
             display_power: 0.0,
             resistance_text: "0".to_string(),
             resistance_value: 0,
+            power_reading: vec![0],
+            time_since_read: 0,
             workout_channel: std::sync::mpsc::channel(),
             stop_workout_flag: true,
             stop_workout_sender: None,
@@ -185,6 +191,7 @@ impl eframe::App for BikeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint(); // update gui with new message - otherwise waits on mouse
         update_text_edits(self);
+        self.time_since_read += 1;
 
         if self.bt_adapters.is_some() && self.selected_adapter_number.is_some() {
             if self.adapter_moved == false {
@@ -370,11 +377,11 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     .clone(),
             );
         }
-        // TODO: better feature display
+        // read available CPS features - not strictly necessary for single bike
         if app_struct.cps_power_feature.is_some() && !app_struct.cps_feature_read {
             // only do this once
             if app_struct.bt_queue_sender.is_some() {
-                let tx = app_struct.bt_queue_sender.unwrap().clone();
+                let tx = app_struct.bt_queue_sender.clone().unwrap();
                 let read_req = QueueItem {
                     action: BtAction::Read,
                     peripheral: app_struct.selected_peripheral.clone().unwrap(),
@@ -385,38 +392,42 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 app_struct.cps_feature_read = true;
             }
         }
-        if ui.button("Subscribe to CPS Power Measurement").clicked() {
-            let subscribe_result = task::block_on(peripheral.subscribe(feature_char2));
-            match subscribe_result {
-                Ok(k) => {
-                    println!("Subscribed to Power Measurement. {:?}", k);
-                    app_struct.power_measurement_subscribed = true;
-                    // spawn a thread to receive notifications
-                    let notification_sender = app_struct.bt_data_channel.0.clone();
-                    let subscribed_peripheral = peripheral.clone();
-                    thread::spawn(move || {
-                        task::block_on(async move {
-                            let notification_result = subscribed_peripheral.notifications().await;
-                            match notification_result {
-                                Ok(notif) => {
-                                    let mut reading = notif.take(1);
-                                    while let Some(data) = reading.next().await {
-                                        println!("Reading: {:?}", data.value);
-                                        // TODO: better error handling here
-                                        notification_sender.send(data.value).unwrap();
-                                        println!("Reading sent.");
-                                    }
-                                }
-                                Err(_) => {} // noting here yet
-                            }
-                        });
-                    });
-                }
-                Err(e) => {
-                    println!("Failed to subscribe to Power Measurement: {:?}", e);
-                }
+        // subscribe to cps power measurement
+        if app_struct.cps_power_measurement.is_some()
+            && !app_struct.power_measurement_subscribed
+            && !app_struct.power_subscribe_request
+        {
+            let tx = app_struct.bt_queue_sender.clone().unwrap();
+            let sub_req = QueueItem {
+                action: BtAction::Subscribe,
+                peripheral: app_struct.selected_peripheral.clone().unwrap(),
+                characteristic: app_struct.cps_power_measurement.clone(),
+                read_type: None,
+            };
+            let _ = tx.send(sub_req); // TODO: send error handling
+            app_struct.power_subscribe_request = true;
+        }
+        // check for confirmation of subscription
+        if app_struct.power_subscribe_request && !app_struct.power_measurement_subscribed {
+            if let Ok(b) = app_struct.subscribed_channel.1.try_recv() {
+                app_struct.power_measurement_subscribed = b;
             }
         }
+        // check for new power measurement notification
+        if app_struct.cps_power_measurement.is_some() && app_struct.time_since_read > 60 {
+            // starting out taking new reading every second, might have to adjust
+            let tx = app_struct.bt_queue_sender.clone().unwrap();
+            let read_req = QueueItem {
+                action: BtAction::Read,
+                peripheral: app_struct.selected_peripheral.clone().unwrap(),
+                characteristic: app_struct.cps_power_measurement.clone(),
+                read_type: Some(CharReadType::CPSPowerReading),
+            };
+            let _ = tx.send(read_req); // TODO: send error handling
+            app_struct.time_since_read = 0;
+        }
+        // TODO: actually receive and display power reading messages
+        /*
         if ui.button("Read Feature 3").clicked() {
             // IDK, don't bother with this one yet I guess
             // it's writable and supports indicate (probably for write result?)
@@ -433,6 +444,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                 }
             }
         }
+        */
         if app_struct.power_measurement_subscribed {
             // receive notifications sent and display here
             match app_struct.bt_data_channel.1.try_recv() {
