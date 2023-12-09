@@ -29,6 +29,13 @@ pub enum BtAction {
     Discover,
 }
 
+#[derive(Clone, Debug)]
+pub enum CharReadType {
+    CPSPowerFeature,
+    CPSPowerReading,
+    CPSControlPoint,
+}
+
 /*=======================================================================
  * STRUCTS
  * ====================================================================*/
@@ -37,6 +44,7 @@ pub struct QueueItem {
     pub action: BtAction,
     pub peripheral: Peripheral,
     pub characteristic: Option<Characteristic>,
+    pub read_type: Option<CharReadType>,
 }
 
 /// channels that bluetooth queue thread will use to send information back
@@ -91,11 +99,23 @@ async fn process_queue_item(
             return Ok(());
         }
         BtAction::Read => {
-            let reading = peripheral.read(&action.characteristic.unwrap()).await?;
-            // TODO: can program crash here?
-            let buffer = u32::from_le_bytes(reading.try_into().unwrap());
-            let read_struct = CpsFeature(buffer);
-            channels.cps_features.send(read_struct)?;
+            // safe enough to unwrap here, never ask for read without a read type
+            match action.read_type.unwrap() {
+                CharReadType::CPSPowerFeature => {
+                    let reading = peripheral.read(&action.characteristic.unwrap()).await?;
+                    let buffer = u32::from_le_bytes(reading.try_into().unwrap());
+                    let feature_struct = CpsFeature(buffer);
+                    println!("CPS Feature: {:?}", feature_struct);
+                }
+                CharReadType::CPSPowerReading => {
+                    let reading = peripheral.read(&action.characteristic.unwrap()).await?;
+                    // TODO: can program crash here?
+                    let buffer = u32::from_le_bytes(reading.try_into().unwrap());
+                    let read_struct = CpsFeature(buffer);
+                    channels.cps_features.send(read_struct)?;
+                }
+                CharReadType::CPSControlPoint => {}
+            }
             return Ok(());
         }
         BtAction::Subscribe => {

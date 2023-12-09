@@ -3,7 +3,7 @@
  * ====================================================================*/
 // local files
 use crate::bluetooth::cps::*;
-use crate::bluetooth::queue::{bt_q_main, BtAction, QueueChannels, QueueItem};
+use crate::bluetooth::queue::{bt_q_main, BtAction, CharReadType, QueueChannels, QueueItem};
 use crate::bluetooth::{bt_adapter_scan, bt_scan};
 use crate::zwo_reader::zwo_command::{create_timeseries, WorkoutTimeSeries};
 use crate::zwo_reader::{zwo_read, Workout};
@@ -105,6 +105,7 @@ pub struct BikeApp {
     cps_power_feature: Option<Characteristic>,
     cps_power_measurement: Option<Characteristic>,
     cps_control_point: Option<Characteristic>,
+    cps_feature_read: bool,
     // workout file stuff
     user_ftp: u32,
     user_ftp_string: String,
@@ -160,6 +161,7 @@ impl Default for BikeApp {
             cps_power_feature: None,
             cps_power_measurement: None,
             cps_control_point: None,
+            cps_feature_read: false,
             user_ftp: 100,
             user_ftp_string: "100".to_string(),
             workout_file: None,
@@ -329,6 +331,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     action: BtAction::Discover,
                     peripheral: peripheral,
                     characteristic: None,
+                    read_type: None,
                 };
                 let _ = tx.send(scan_req); // TODO: error handling
                 app_struct.scanned = true;
@@ -352,40 +355,34 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     .unwrap()
                     .clone(),
             );
+            app_struct.cps_power_measurement = Some(
+                chars
+                    .iter()
+                    .find(|c| c.uuid == CPS_POWER_MEASUREMENT)
+                    .unwrap()
+                    .clone(),
+            );
+            app_struct.cps_control_point = Some(
+                chars
+                    .iter()
+                    .find(|c| c.uuid == CPS_CONTROL_POINT)
+                    .unwrap()
+                    .clone(),
+            );
         }
-        // TODO: only need to do this once, not every loop - store discovered services in app
-        let peripheral = app_struct.selected_peripheral.clone().unwrap();
-        let _ = task::block_on(peripheral.discover_services());
-        let characteristics = peripheral.characteristics();
-        let feature_char = characteristics
-            .iter()
-            .find(|c| c.uuid == CPS_POWER_FEATURE)
-            .unwrap();
-        let feature_char2 = characteristics
-            .iter()
-            .find(|c| c.uuid == CPS_POWER_MEASUREMENT)
-            .unwrap();
-        let feature_char3 = characteristics
-            .iter()
-            .find(|c| c.uuid == CPS_CONTROL_POINT)
-            .unwrap();
-        if ui.button("Read CPS Power Feature").clicked() {
-            // probably don't need to read this one to get working for a single bike
-            let read_result = task::block_on(peripheral.read(feature_char));
-            // subscribe and notify instead?
-            match read_result {
-                Ok(buf) => {
-                    println!("Feature buffer length: {:?}", buf.len());
-                    let hack_buffer = u32::from_le_bytes(buf.clone().try_into().unwrap());
-                    let hack_struct = CpsFeature(hack_buffer);
-                    println!("{:?}", hack_struct);
-                    let combined_buffer = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
-                    let feature_struct = CpsFeature(combined_buffer);
-                    println!("{:?}", feature_struct);
-                }
-                Err(e) => {
-                    ui.label(e.to_string());
-                }
+        // TODO: better feature display
+        if app_struct.cps_power_feature.is_some() && !app_struct.cps_feature_read {
+            // only do this once
+            if app_struct.bt_queue_sender.is_some() {
+                let tx = app_struct.bt_queue_sender.unwrap().clone();
+                let read_req = QueueItem {
+                    action: BtAction::Read,
+                    peripheral: app_struct.selected_peripheral.clone().unwrap(),
+                    characteristic: app_struct.cps_power_feature.clone(),
+                    read_type: Some(CharReadType::CPSPowerFeature),
+                };
+                let _ = tx.send(read_req); // TODO: send error handling
+                app_struct.cps_feature_read = true;
             }
         }
         if ui.button("Subscribe to CPS Power Measurement").clicked() {
