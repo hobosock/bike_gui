@@ -346,7 +346,7 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
         {
             let chars = app_struct.discovered_characteristics.clone().unwrap();
             app_struct.cps_power_feature = Some(
-                *chars
+                chars
                     .iter()
                     .find(|c| c.uuid == CPS_POWER_FEATURE)
                     .unwrap()
