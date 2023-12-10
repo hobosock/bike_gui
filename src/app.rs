@@ -414,8 +414,8 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             }
         }
         // check for new power measurement notification
+        // starting out taking new reading every second, might have to adjust
         if app_struct.cps_power_measurement.is_some() && app_struct.time_since_read > 60 {
-            // starting out taking new reading every second, might have to adjust
             let tx = app_struct.bt_queue_sender.clone().unwrap();
             let read_req = QueueItem {
                 action: BtAction::Read,
@@ -427,6 +427,13 @@ fn draw_main_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             app_struct.time_since_read = 0;
         }
         // TODO: actually receive and display power reading messages
+        if let Ok(power_reading) = app_struct.cps_channel.1.try_recv() {
+            app_struct.power_reading = power_reading;
+        }
+        for value in app_struct.power_reading.iter() {
+            ui.label(value.to_string());
+        }
+
         /*
         if ui.button("Read Feature 3").clicked() {
             // IDK, don't bother with this one yet I guess
