@@ -103,6 +103,11 @@ pub struct BikeApp {
         std::sync::mpsc::Receiver<BTreeSet<Characteristic>>,
     ),
     discovered_characteristics: Option<BTreeSet<Characteristic>>,
+    peripheral_name_channel: (
+        std::sync::mpsc::Sender<String>,
+        std::sync::mpsc::Receiver<String>,
+    ),
+    peripheral_name_requested: bool,
     cps_power_feature: Option<Characteristic>,
     cps_power_measurement: Option<Characteristic>,
     cps_control_point: Option<Characteristic>,
@@ -162,6 +167,8 @@ impl Default for BikeApp {
             scanned: false,
             char_channel: std::sync::mpsc::channel(),
             discovered_characteristics: None,
+            peripheral_name_channel: std::sync::mpsc::channel(),
+            peripheral_name_requested: false,
             cps_power_feature: None,
             cps_power_measurement: None,
             cps_control_point: None,
@@ -222,6 +229,7 @@ impl eframe::App for BikeApp {
                         cps_features: self.features_channel.0.clone(),
                         results: self.results_channel.0.clone(),
                         characteristics: self.char_channel.0.clone(),
+                        peripheral_name: self.peripheral_name_channel.0.clone(),
                     };
                     thread::spawn(move || async {
                         bt_q_main(bt_queue_recv, channels, kill_rx).await;
@@ -240,11 +248,26 @@ impl eframe::App for BikeApp {
                     self.peripheral_list.as_ref().unwrap()
                         [self.selected_peripheral_number.clone().unwrap()]
                 );
-                // TODO: move to new thread
-                self.peripheral_text = task::block_on(update_peripheral_text(
-                    &self.peripheral_list.as_ref().unwrap()
-                        [self.selected_peripheral_number.clone().unwrap()],
-                ));
+                // TODO: move to new thread - doesn't happen much
+                if !self.peripheral_name_requested {
+                    let peripheral_name_req = QueueItem {
+                        action: BtAction::Properties,
+                        peripheral: self
+                            .peripheral_list
+                            .clone()
+                            .unwrap()
+                            .remove(self.selected_peripheral_number.clone().unwrap()),
+                        characteristic: None,
+                        read_type: None,
+                    };
+                    let tx = self.bt_queue_sender.clone().unwrap(); // TODO: make sure unwrap() ok
+                    let _ = tx.send(peripheral_name_req); // TODO: send error handling
+                    self.peripheral_name_requested = true;
+                } else {
+                    if let Ok(name) = self.peripheral_name_channel.1.try_recv() {
+                        self.peripheral_text = name;
+                    }
+                }
                 self.selected_peripheral = Some(
                     self.peripheral_list
                         .as_mut()
@@ -308,22 +331,6 @@ async fn update_adapter_text(adapter: &Adapter) -> String {
         Err(e) => adapter_str = e.to_string(),
     }
     return adapter_str;
-}
-
-/// update bluetooth peripheral combobox text based on selection
-async fn update_peripheral_text(peripheral: &Peripheral) -> String {
-    let mut peripheral_str = peripheral.id().to_string();
-    match peripheral.properties().await {
-        Ok(properties) => match properties {
-            Some(prop) => match prop.local_name {
-                Some(name) => peripheral_str = name,
-                None => {}
-            },
-            None => {}
-        },
-        Err(_) => {}
-    }
-    return peripheral_str;
 }
 
 /// draws the main tab

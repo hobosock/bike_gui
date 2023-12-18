@@ -27,6 +27,7 @@ pub enum BtAction {
     Connect,
     Disconnect,
     Discover,
+    Properties,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,7 @@ pub struct QueueChannels {
     pub cps_features: Sender<CpsFeature>,
     pub results: Sender<String>,
     pub characteristics: Sender<BTreeSet<Characteristic>>,
+    pub peripheral_name: Sender<String>,
 }
 
 /*=======================================================================
@@ -159,6 +161,22 @@ async fn process_queue_item(
             let _ = peripheral.discover_services();
             let characteristics = peripheral.characteristics();
             let _ = channels.characteristics.send(characteristics); // TODO: send error handling
+            return Ok(());
+        }
+        BtAction::Properties => {
+            println!("Getting peripheral properties...");
+            let mut peripheral_str = peripheral.id().to_string();
+            match peripheral.properties().await {
+                Ok(properties) => match properties {
+                    Some(prop) => match prop.local_name {
+                        Some(name) => peripheral_str = name,
+                        None => {}
+                    },
+                    None => {}
+                },
+                Err(_) => {}
+            }
+            let _ = channels.peripheral_name.send(peripheral_str); // TODO: send error handling
             return Ok(());
         }
     }
