@@ -678,23 +678,15 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
             Err(_) => {}
         }
         if app_struct.peripheral_moved {
-            let mut name_str = app_struct
-                .selected_peripheral
-                .clone()
-                .unwrap()
-                .id()
-                .to_string();
-            let properties_result =
-                task::block_on(app_struct.selected_peripheral.clone().unwrap().properties());
-            match properties_result {
-                Ok(prop_option) => {
-                    if prop_option.is_some() {
-                        if prop_option.clone().unwrap().local_name.is_some() {
-                            name_str = prop_option.clone().unwrap().local_name.unwrap();
-                        }
-                    }
-                }
-                Err(_) => {}
+            // placeholder until local name can be scanned - ID should already exist
+            if app_struct.peripheral_text == "None selected".to_string() {
+                let name_str = app_struct
+                    .selected_peripheral
+                    .clone()
+                    .unwrap()
+                    .id()
+                    .to_string();
+                app_struct.peripheral_text = name_str;
             }
             egui::ComboBox::from_label("Choose a device.")
                 .selected_text(&app_struct.peripheral_text)
@@ -702,7 +694,7 @@ fn draw_bluetooth_tab(ui: &mut Ui, app_struct: &mut BikeApp) {
                     ui.selectable_value(
                         &mut app_struct.selected_peripheral_number,
                         Some(0 as usize),
-                        name_str,
+                        app_struct.peripheral_text.clone(),
                     );
                 });
         } else {
